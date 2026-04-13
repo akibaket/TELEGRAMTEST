@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Mini App - Detector de Usuario</title>
+    <!-- Cargamos el SDK oficial de Telegram para Mini Apps -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .tg-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .user-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto 1.5rem;
+            border: 4px solid #3b82f6;
+            background: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="tg-card">
+        <div id="avatar-container" class="user-avatar">
+            ?
+        </div>
+        <h1 class="text-2xl font-bold mb-2">¡Bienvenido!</h1>
+        <p id="user-display" class="text-blue-400 text-lg font-medium mb-6">Cargando datos...</p>
+        
+        <div id="debug-info" class="text-xs text-gray-500 mt-4 p-3 bg-black/30 rounded-lg text-left overflow-auto hidden">
+            <!-- Información técnica para desarrollo -->
+        </div>
+
+        <button onclick="closeApp()" class="mt-6 w-full py-3 bg-blue-600 hover:bg-blue-500 transition-colors rounded-xl font-bold text-white uppercase tracking-wider">
+            Cerrar Aplicación
+        </button>
+    </div>
+
+    <script>
+        // Inicializamos la WebApp de Telegram
+        const tele = window.Telegram.WebApp;
+
+        // Expandir la aplicación para que ocupe toda la pantalla disponible
+        tele.expand();
+
+        // Configurar los colores de la cabecera según el tema de Telegram
+        tele.setHeaderColor('secondary_bg_color');
+
+        function initApp() {
+            const userDisplay = document.getElementById('user-display');
+            const avatarContainer = document.getElementById('avatar-container');
+            const debugInfo = document.getElementById('debug-info');
+
+            // Obtenemos los datos del usuario desde Telegram
+            const user = tele.initDataUnsafe?.user;
+
+            if (user) {
+                // Si hay datos, mostramos el nombre
+                const firstName = user.first_name || "";
+                const lastName = user.last_name || "";
+                const username = user.username ? `@${user.username}` : "";
+                
+                userDisplay.innerHTML = `${firstName} ${lastName}<br><span class="text-sm opacity-70">${username}</span>`;
+                
+                // Si tiene inicial, la ponemos en el avatar
+                avatarContainer.innerText = firstName.charAt(0).toUpperCase();
+
+                // Mostramos info técnica en el cuadro de debug
+                debugInfo.classList.remove('hidden');
+                debugInfo.innerHTML = `<strong>ID:</strong> ${user.id}<br><strong>Idioma:</strong> ${user.language_code}`;
+                
+                // Notificar a Telegram que la app está lista
+                tele.ready();
+            } else {
+                // Si se abre fuera de Telegram
+                userDisplay.innerText = "Usuario no detectado";
+                userDisplay.classList.add('text-red-400');
+                avatarContainer.innerText = "!";
+                debugInfo.classList.remove('hidden');
+                debugInfo.innerText = "Por favor, abre esta aplicación desde un bot de Telegram.";
+            }
+        }
+
+        function closeApp() {
+            tele.close();
+        }
+
+        // Ejecutar al cargar la página
+        window.onload = initApp;
+    </script>
+</body>
+</html>
