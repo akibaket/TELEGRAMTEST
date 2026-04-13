@@ -3,118 +3,341 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Mini App - Detector de Usuario</title>
-    <!-- Cargamos el SDK oficial de Telegram para Mini Apps -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>Mis Tareas (Firebase + Vanilla JS)</title>
+    <!-- Tailwind CSS para el diseño -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons (alternativa ligera a Lucide para Vanilla JS) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
     <style>
-        body {
-            background: #0f172a;
-            color: #f8fafc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            overflow: hidden;
+        /* Estilos personalizados sutiles */
+        body { background-color: #020617; color: #e2e8f0; }
+        .todo-enter { animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .tg-card {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 2rem;
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-        .user-avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            margin: 0 auto 1.5rem;
-            border: 4px solid #3b82f6;
-            background: #1e293b;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: #3b82f6;
-        }
+        /* Ocultar barra de desplazamiento para un look más limpio en móvil */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
-<body>
+<body class="font-sans antialiased min-h-screen p-4 md:p-8">
 
-    <div class="tg-card">
-        <div id="avatar-container" class="user-avatar">
-            ?
-        </div>
-        <h1 class="text-2xl font-bold mb-2">¡Bienvenido!</h1>
-        <p id="user-display" class="text-blue-400 text-lg font-medium mb-6">Cargando datos...</p>
-        
-        <div id="debug-info" class="text-xs text-gray-500 mt-4 p-3 bg-black/30 rounded-lg text-left overflow-auto hidden">
-            <!-- Información técnica para desarrollo -->
-        </div>
-
-        <button onclick="closeApp()" class="mt-6 w-full py-3 bg-blue-600 hover:bg-blue-500 transition-colors rounded-xl font-bold text-white uppercase tracking-wider">
-            Cerrar Aplicación
-        </button>
+    <!-- Pantalla de Carga Inicial -->
+    <div id="loading-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950">
+        <i class="ph ph-spinner-gap text-4xl text-blue-500 animate-spin mb-4"></i>
+        <p class="text-slate-400">Conectando con Firebase...</p>
     </div>
 
-    <script>
-        // Inicializamos la WebApp de Telegram
-        const tele = window.Telegram.WebApp;
+    <!-- Contenedor Principal de la App (Oculto inicialmente) -->
+    <div id="app-container" class="max-w-md mx-auto hidden">
+        
+        <!-- Cabecera -->
+        <div class="flex items-center gap-3 mb-8">
+            <div class="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-900/20">
+                <i class="ph ph-list-checks text-2xl text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight">Mis Tareas</h1>
+        </div>
 
-        // Expandir la aplicación para que ocupe toda la pantalla disponible
-        tele.expand();
+        <!-- Formulario para Añadir/Editar Tarea -->
+        <form id="todo-form" class="mb-8 relative">
+            <input 
+                type="text" 
+                id="todo-input" 
+                placeholder="Añadir nueva tarea..." 
+                class="w-full bg-slate-900 border border-slate-800 rounded-xl py-4 pl-4 pr-14 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600 text-slate-200"
+                required
+            >
+            <button 
+                type="submit" 
+                id="submit-btn"
+                class="absolute right-2 top-2 bottom-2 bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-lg transition-colors flex items-center justify-center"
+            >
+                <i class="ph ph-plus text-xl" id="submit-icon"></i>
+            </button>
+            
+            <!-- Botón para cancelar edición (oculto por defecto) -->
+            <button 
+                type="button" 
+                id="cancel-edit-btn" 
+                class="hidden mt-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+                Cancelar edición
+            </button>
+        </form>
 
-        // Configurar los colores de la cabecera según el tema de Telegram
-        tele.setHeaderColor('secondary_bg_color');
+        <!-- Lista de Tareas -->
+        <div id="todo-list" class="space-y-3">
+            <!-- Los elementos se inyectarán aquí mediante JS -->
+        </div>
 
-        function initApp() {
-            const userDisplay = document.getElementById('user-display');
-            const avatarContainer = document.getElementById('avatar-container');
-            const debugInfo = document.getElementById('debug-info');
+        <!-- Pie de página (Info) -->
+        <div class="mt-8 pt-6 border-t border-slate-900 flex justify-between items-center text-[10px] uppercase tracking-widest text-slate-600">
+            <span id="user-uid">UID: --</span>
+            <span class="flex items-center gap-1">
+                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                Firebase Sync
+            </span>
+        </div>
+    </div>
 
-            // Obtenemos los datos del usuario desde Telegram
-            const user = tele.initDataUnsafe?.user;
+    <!-- ========================================== -->
+    <!-- LÓGICA JAVASCRIPT & FIREBASE INTEGRADA -->
+    <!-- ========================================== -->
+    <script type="module">
+        // 1. IMPORTACIONES DE FIREBASE (Módulos ESM)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            onSnapshot, 
+            doc, 
+            updateDoc, 
+            deleteDoc, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-            if (user) {
-                // Si hay datos, mostramos el nombre
-                const firstName = user.first_name || "";
-                const lastName = user.last_name || "";
-                const username = user.username ? `@${user.username}` : "";
-                
-                userDisplay.innerHTML = `${firstName} ${lastName}<br><span class="text-sm opacity-70">${username}</span>`;
-                
-                // Si tiene inicial, la ponemos en el avatar
-                avatarContainer.innerText = firstName.charAt(0).toUpperCase();
+        // --- ⚠️ ¡ATENCIÓN! PEGA TU CONFIGURACIÓN AQUÍ ⚠️ ---
+        const firebaseConfig = {
+            apiKey: "",
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
 
-                // Mostramos info técnica en el cuadro de debug
-                debugInfo.classList.remove('hidden');
-                debugInfo.innerHTML = `<strong>ID:</strong> ${user.id}<br><strong>Idioma:</strong> ${user.language_code}`;
-                
-                // Notificar a Telegram que la app está lista
-                tele.ready();
-            } else {
-                // Si se abre fuera de Telegram
-                userDisplay.innerText = "Usuario no detectado";
-                userDisplay.classList.add('text-red-400');
-                avatarContainer.innerText = "!";
-                debugInfo.classList.remove('hidden');
-                debugInfo.innerText = "Por favor, abre esta aplicación desde un bot de Telegram.";
+        // 2. INICIALIZACIÓN
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // Variables globales
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'vanilla-todo-app';
+        let currentUser = null;
+        let unsubscribeSnapshot = null;
+        let currentEditingId = null; // Guardará el ID de la tarea si estamos editando
+
+        // Elementos del DOM
+        const loadingScreen = document.getElementById('loading-screen');
+        const appContainer = document.getElementById('app-container');
+        const todoListEl = document.getElementById('todo-list');
+        const todoForm = document.getElementById('todo-form');
+        const todoInput = document.getElementById('todo-input');
+        const submitIcon = document.getElementById('submit-icon');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        const userUidEl = document.getElementById('user-uid');
+
+        // 3. AUTENTICACIÓN (REGLA 3: Auth antes de Queries)
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Error al autenticar:", error);
+                alert("Error de conexión. Revisa la consola.");
             }
         }
 
-        function closeApp() {
-            tele.close();
+        // Escuchar cambios en el estado de autenticación
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                userUidEl.textContent = `UID: ${user.uid.substring(0, 8)}...`;
+                loadingScreen.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+                setupRealtimeListener(); // Iniciar la escucha de datos
+            } else {
+                currentUser = null;
+                if (unsubscribeSnapshot) unsubscribeSnapshot(); // Limpiar listener
+            }
+        });
+
+        // 4. LECTURA EN TIEMPO REAL (REGLAS 1 y 2)
+        function setupRealtimeListener() {
+            if (!currentUser) return;
+
+            // Ruta privada
+            const todosRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos');
+            
+            // onSnapshot maneja actualizaciones instantáneas
+            unsubscribeSnapshot = onSnapshot(todosRef, (snapshot) => {
+                const todos = [];
+                snapshot.forEach((doc) => {
+                    todos.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Ordenar en memoria por fecha de creación (Evita requerir índices en Firebase)
+                todos.sort((a, b) => {
+                    const timeA = a.createdAt?.seconds || 0;
+                    const timeB = b.createdAt?.seconds || 0;
+                    return timeB - timeA; // Más recientes primero
+                });
+
+                renderTodos(todos);
+            }, (error) => {
+                console.error("Error al obtener datos:", error);
+            });
         }
 
-        // Ejecutar al cargar la página
-        window.onload = initApp;
+        // 5. RENDERIZADO EN EL DOM
+        function renderTodos(todos) {
+            todoListEl.innerHTML = ''; // Limpiar lista actual
+
+            if (todos.length === 0) {
+                todoListEl.innerHTML = `
+                    <div class="py-10 text-center bg-slate-900/50 rounded-2xl border border-dashed border-slate-800 todo-enter">
+                        <p class="text-slate-500 italic">No hay tareas pendientes. ¡Buen trabajo!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            todos.forEach(todo => {
+                const isCompleted = todo.completed;
+                const div = document.createElement('div');
+                div.className = `group flex items-center gap-3 p-4 rounded-xl border transition-all todo-enter ${
+                    isCompleted ? 'bg-slate-900/30 border-slate-800/50 opacity-60' : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                }`;
+
+                div.innerHTML = `
+                    <button class="toggle-btn transition-colors ${isCompleted ? 'text-green-500' : 'text-slate-600 group-hover:text-slate-400'}" data-id="${todo.id}" data-completed="${isCompleted}">
+                        <i class="ph text-2xl ${isCompleted ? 'ph-check-circle weight-fill' : 'ph-circle'}"></i>
+                    </button>
+                    
+                    <span class="flex-1 text-sm md:text-base ${isCompleted ? 'line-through text-slate-500' : 'text-slate-200'}">
+                        ${escapeHTML(todo.text)}
+                    </span>
+
+                    <div class="flex gap-1">
+                        ${!isCompleted ? `
+                            <button class="edit-btn p-2 text-slate-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all" data-id="${todo.id}" data-text="${escapeHTML(todo.text)}">
+                                <i class="ph ph-pencil-simple text-lg"></i>
+                            </button>
+                        ` : ''}
+                        <button class="delete-btn p-2 text-slate-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all" data-id="${todo.id}">
+                            <i class="ph ph-trash text-lg"></i>
+                        </button>
+                    </div>
+                `;
+                todoListEl.appendChild(div);
+            });
+
+            // Asignar eventos a los botones recién creados
+            attachEventListeners();
+        }
+
+        // 6. ACCIONES: CREAR / EDITAR / ELIMINAR / MARCAR
+        todoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            const text = todoInput.value.trim();
+            if (!text) return;
+
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true; // Prevenir doble click
+
+            try {
+                if (currentEditingId) {
+                    // MODO EDICIÓN
+                    const todoRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos', currentEditingId);
+                    await updateDoc(todoRef, { text: text });
+                    exitEditMode();
+                } else {
+                    // MODO CREACIÓN
+                    const todosRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos');
+                    await addDoc(todosRef, {
+                        text: text,
+                        completed: false,
+                        createdAt: serverTimestamp()
+                    });
+                    todoInput.value = '';
+                }
+            } catch (error) {
+                console.error("Error guardando tarea:", error);
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        function attachEventListeners() {
+            // Alternar estado (Completado / No completado)
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = btn.getAttribute('data-id');
+                    const isCompleted = btn.getAttribute('data-completed') === 'true';
+                    const todoRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos', id);
+                    await updateDoc(todoRef, { completed: !isCompleted });
+                });
+            });
+
+            // Eliminar tarea
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = btn.getAttribute('data-id');
+                    const todoRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos', id);
+                    await deleteDoc(todoRef);
+                });
+            });
+
+            // Iniciar edición
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = btn.getAttribute('data-id');
+                    const text = btn.getAttribute('data-text');
+                    enterEditMode(id, text);
+                });
+            });
+        }
+
+        // Utilidades para Modo Edición
+        function enterEditMode(id, text) {
+            currentEditingId = id;
+            todoInput.value = text;
+            todoInput.focus();
+            submitIcon.className = "ph ph-check text-xl"; // Cambiar icono a 'check'
+            cancelEditBtn.classList.remove('hidden');
+        }
+
+        function exitEditMode() {
+            currentEditingId = null;
+            todoInput.value = '';
+            submitIcon.className = "ph ph-plus text-xl"; // Volver a icono '+'
+            cancelEditBtn.classList.add('hidden');
+        }
+
+        cancelEditBtn.addEventListener('click', exitEditMode);
+
+        // Seguridad básica contra inyección de HTML
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag])
+            );
+        }
+
+        // 7. INICIAR LA APP
+        window.onload = initAuth;
+
     </script>
 </body>
 </html>
