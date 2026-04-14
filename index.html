@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Burst Clicker | Cyberpunk Arena</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
+        :root { --neon-blue: #00f2ff; --neon-pink: #ff00ff; --dark-bg: #020617; }
+        body { background-color: var(--dark-bg); color: #e2e8f0; font-family: 'Rajdhani', sans-serif; margin: 0; user-select: none; }
+        .cyber-font { font-family: 'Orbitron', sans-serif; }
+        .glass-panel { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 242, 255, 0.2); }
+        .neon-border { border: 1px solid var(--neon-blue); box-shadow: 0 0 15px rgba(0, 242, 255, 0.1); }
+        .stat-bar { height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; overflow: hidden; }
+        .stat-progress { height: 100%; background: linear-gradient(90deg, var(--neon-blue), #3b82f6); box-shadow: 0 0 10px var(--neon-blue); transition: width 0.5s ease; }
+        .tab-active { color: var(--neon-blue); border-bottom: 2px solid var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
+        .loader-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        /* Estilo de la tarjeta de rival */
+        .rival-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+            transition: all 0.2s ease;
+        }
+        .rival-card:active { transform: scale(0.98); background: rgba(0, 242, 255, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Loader -->
+    <div id="loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950">
+        <div class="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full loader-spin"></div>
+        <p class="mt-6 cyber-font text-cyan-400 tracking-widest animate-pulse uppercase">Cargando Datos...</p>
+        <p id="error-display" class="mt-4 text-red-500 hidden text-center px-6 text-xs italic"></p>
+    </div>
+
+    <!-- Modal de Resultado Combate -->
+    <div id="battle-modal" class="fixed inset-0 z-[60] hidden bg-slate-950/90 flex items-center justify-center p-6 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-8 border-cyan-500/50 text-center space-y-4">
+            <h3 id="battle-title" class="cyber-font text-2xl font-bold">RESULTADO</h3>
+            <p id="battle-log" class="text-sm text-slate-400 italic py-4"></p>
+            <div id="battle-reward" class="py-2 px-4 bg-cyan-500/20 rounded-xl cyber-font text-cyan-400"></div>
+            <button onclick="closeBattleModal()" class="w-full py-3 bg-cyan-600 rounded-xl cyber-font font-bold mt-4 shadow-lg shadow-cyan-500/20">CONFIRMAR</button>
+        </div>
+    </div>
+
+    <!-- Main Header -->
+    <header class="p-4 flex justify-between items-center glass-panel border-b border-cyan-900/30 sticky top-0 z-40">
+        <div>
+            <span class="text-[10px] text-cyan-500 cyber-font uppercase">Créditos</span>
+            <div class="flex items-center gap-1 font-bold cyber-font">
+                <i class="ph ph-coins text-yellow-400"></i>
+                <span id="ui-points">0</span>
+            </div>
+        </div>
+        <div class="text-right">
+            <span class="text-[10px] text-pink-500 cyber-font uppercase">Energía</span>
+            <div class="flex items-center gap-1 font-bold cyber-font justify-end">
+                <span id="ui-energy">0/10</span>
+                <i class="ph ph-lightning-fill text-pink-500"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- App Content -->
+    <main class="flex-1 p-4 pb-24">
+        <!-- Profile Tab -->
+        <section id="tab-profile" class="tab-content space-y-6">
+            <div class="glass-panel rounded-3xl p-6 neon-border relative overflow-hidden">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 id="ui-username" class="text-2xl font-bold cyber-font text-white italic">---</h2>
+                        <span id="ui-level" class="inline-block bg-cyan-950 text-cyan-400 text-[10px] px-2 py-0.5 rounded border border-cyan-500/40 cyber-font uppercase">LEVEL --</span>
+                    </div>
+                    <i class="ph ph-shield-check text-4xl text-cyan-500/20"></i>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[11px] text-slate-400"><span>STRENGTH</span><span id="ui-str" class="text-cyan-400">0</span></div>
+                        <div class="stat-bar"><div id="bar-str" class="stat-progress" style="width: 0%"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[11px] text-slate-400"><span>AGILITY</span><span id="ui-agi" class="text-pink-400">0</span></div>
+                        <div class="stat-bar"><div id="bar-agi" class="stat-progress" style="width: 0%; background: #ff00ff;"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[11px] text-slate-400"><span>INTELLIGENCE</span><span id="ui-int" class="text-purple-400">0</span></div>
+                        <div class="stat-bar"><div id="bar-int" class="stat-progress" style="width: 0%; background: #a855f7;"></div></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/5 text-center">
+                    <div><span class="block text-[10px] text-slate-500 cyber-font">HP</span><span id="ui-hp" class="text-lg font-bold text-green-400">0</span></div>
+                    <div><span class="block text-[10px] text-slate-500 cyber-font">ATK</span><span id="ui-dmg" class="text-lg font-bold text-red-500">0</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Arena Tab -->
+        <section id="tab-arena" class="tab-content hidden space-y-4">
+            <div class="flex justify-between items-center px-2">
+                <h3 class="cyber-font text-lg text-cyan-400">ARENA DE DUELOS</h3>
+                <button onclick="refreshArena()" class="text-cyan-500 p-2"><i class="ph ph-arrows-clockwise text-xl"></i></button>
+            </div>
+            <div id="arena-list" class="space-y-3">
+                <!-- Los rivales se cargan aquí -->
+            </div>
+        </section>
+
+        <!-- Wheel Tab -->
+        <section id="tab-wheel" class="tab-content hidden text-center py-20">
+            <i class="ph ph-clover text-6xl text-pink-500/20 mb-4 block mx-auto"></i>
+            <p class="cyber-font text-pink-600 uppercase">Ruleta en Construcción</p>
+        </section>
+    </main>
+
+    <!-- Nav Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 glass-panel border-t border-cyan-900/30 px-8 py-4 flex justify-between items-center z-40">
+        <button onclick="changeTab('profile')" id="nav-profile" class="tab-active flex flex-col items-center gap-1">
+            <i class="ph ph-user text-2xl"></i>
+            <span class="text-[9px] cyber-font">PERFIL</span>
+        </button>
+        <button onclick="changeTab('arena')" id="nav-arena" class="text-slate-500 flex flex-col items-center gap-1">
+            <i class="ph ph-sword text-2xl"></i>
+            <span class="text-[9px] cyber-font">ARENA</span>
+        </button>
+        <button onclick="changeTab('wheel')" id="nav-wheel" class="text-slate-500 flex flex-col items-center gap-1">
+            <i class="ph ph-clover text-2xl"></i>
+            <span class="text-[9px] cyber-font">SUERTE</span>
+        </button>
+    </nav>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection, query, limit, getDocs, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // CONFIGURACIÓN DE FIREBASE (Asegúrate de tener tus datos aquí)
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROYECTO.firebaseapp.com",
+            projectId: "TU_PROYECTO",
+            storageBucket: "TU_PROYECTO.appspot.com",
+            messagingSenderId: "TU_ID",
+            appId: "TU_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        let localUser = null;
+
+        const logError = (msg) => {
+            const errEl = document.getElementById('error-display');
+            errEl.innerText = msg;
+            errEl.classList.remove('hidden');
+        };
+
+        // --- LÓGICA DE PESTAÑAS ---
+        window.changeTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(el => {
+                el.classList.remove('tab-active');
+                el.classList.add('text-slate-500');
+            });
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.getElementById(`nav-${tabId}`).classList.add('tab-active');
+            document.getElementById(`nav-${tabId}`).classList.remove('text-slate-500');
+
+            if (tabId === 'arena') refreshArena();
+        };
+
+        // --- ARENA: LISTAR RIVALES ---
+        window.refreshArena = async () => {
+            const listEl = document.getElementById('arena-list');
+            listEl.innerHTML = '<div class="p-8 text-center animate-pulse text-cyan-500">Escanenando red de duelos...</div>';
+            
+            try {
+                // Buscamos 6 rivales (uno puede ser el usuario mismo)
+                const q = query(collection(db, "arena_list"), limit(6));
+                const querySnap = await getDocs(q);
+                
+                listEl.innerHTML = '';
+                querySnap.forEach((rivalDoc) => {
+                    const rival = rivalDoc.data();
+                    if (rival.uid === auth.currentUser.uid) return;
+
+                    const card = document.createElement('div');
+                    card.className = 'rival-card p-4 rounded-2xl flex justify-between items-center border border-white/5';
+                    card.innerHTML = `
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full bg-cyan-900/50 flex items-center justify-center border border-cyan-500/30">
+                                <i class="ph ph-user text-cyan-400"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold cyber-font text-sm uppercase">${rival.username}</h4>
+                                <span class="text-[10px] text-cyan-500 cyber-font">LVL ${rival.level}</span>
+                            </div>
+                        </div>
+                        <button onclick="challenge('${rival.uid}')" class="px-4 py-1.5 bg-cyan-500 text-slate-950 text-xs font-bold cyber-font rounded-lg active:scale-90 transition-transform">RETAR</button>
+                    `;
+                    listEl.appendChild(card);
+                });
+            } catch (e) {
+                listEl.innerHTML = '<p class="text-center text-red-500">Error al cargar Arena.</p>';
+            }
+        };
+
+        // --- ARENA: MOTOR DE COMBATE ---
+        window.challenge = async (rivalUid) => {
+            if (localUser.energy <= 0) {
+                alert("Sin energía neural. Espera la recarga.");
+                return;
+            }
+
+            try {
+                const rivalRef = doc(db, "players", rivalUid);
+                const rivalSnap = await getDoc(rivalRef);
+                
+                if (!rivalSnap.exists()) return;
+                const rival = rivalSnap.data();
+
+                // Lógica de Combate
+                // Tu HP: STR * 10 | Daño: STR * 2
+                // Se simulan golpes por turnos
+                let myHp = localUser.stats.str * 10 + (localUser.level * 20);
+                let enemyHp = rival.stats.str * 10 + (rival.level * 20);
+                let myAtk = localUser.stats.str * 2 + (localUser.level * 5);
+                let enemyAtk = rival.stats.str * 2 + (rival.level * 5);
+
+                // Probabilidad de esquiva basada en AGI (INT aporta criticos en el futuro)
+                const win = (myAtk * (1 + localUser.stats.agi/100)) > (enemyAtk * (1 + rival.stats.agi/100));
+                
+                // Actualizar DB
+                const playerRef = doc(db, "players", auth.currentUser.uid);
+                const reward = win ? 50 : 0;
+
+                await updateDoc(playerRef, {
+                    energy: increment(-1),
+                    points: increment(reward)
+                });
+
+                // Mostrar Resultado
+                document.getElementById('battle-modal').classList.remove('hidden');
+                document.getElementById('battle-title').innerText = win ? "¡VICTORIA!" : "DERROTA";
+                document.getElementById('battle-title').className = `cyber-font text-2xl font-bold ${win ? 'text-green-400' : 'text-red-500'}`;
+                document.getElementById('battle-log').innerText = win 
+                    ? `Has sobrepasado las defensas de ${rival.username}. Su núcleo neural ha colapsado.`
+                    : `${rival.username} fue más rápido. Has sido desconectado de la arena.`;
+                document.getElementById('battle-reward').innerText = win ? `+${reward} Burst Points` : "0 Burst Points";
+
+            } catch (e) {
+                console.error(e);
+            }
+        };
+
+        window.closeBattleModal = () => {
+            document.getElementById('battle-modal').classList.add('hidden');
+        };
+
+        // --- INICIALIZACIÓN ---
+        async function setupPlayer(user) {
+            try {
+                const pRef = doc(db, "players", user.uid);
+                const pSnap = await getDoc(pRef);
+
+                if (!pSnap.exists()) {
+                    const str = Math.floor(Math.random() * 11) + 5;
+                    const agi = Math.floor(Math.random() * 11) + 5;
+                    const int = Math.floor(Math.random() * 11) + 5;
+                    const tgName = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || "Guest";
+
+                    const initialData = {
+                        uid: user.uid,
+                        username: tgName,
+                        points: 100,
+                        level: 1,
+                        energy: 10,
+                        stats: { str, agi, int },
+                        createdAt: serverTimestamp()
+                    };
+
+                    await setDoc(pRef, initialData);
+                    await setDoc(doc(db, "arena_list", user.uid), { username: tgName, level: 1, uid: user.uid });
+                }
+
+                onSnapshot(pRef, (snap) => {
+                    if (snap.exists()) {
+                        localUser = snap.data();
+                        renderUI();
+                        document.getElementById('loader').classList.add('hidden');
+                    }
+                });
+
+            } catch (e) {
+                logError("Error crítico: " + e.message);
+            }
+        }
+
+        function renderUI() {
+            if (!localUser) return;
+            document.getElementById('ui-points').innerText = localUser.points;
+            document.getElementById('ui-energy').innerText = `${localUser.energy}/10`;
+            document.getElementById('ui-username').innerText = localUser.username;
+            document.getElementById('ui-level').innerText = `LEVEL ${localUser.level}`;
+            document.getElementById('ui-str').innerText = localUser.stats.str;
+            document.getElementById('ui-agi').innerText = localUser.stats.agi;
+            document.getElementById('ui-int').innerText = localUser.stats.int;
+            document.getElementById('bar-str').style.width = `${(localUser.stats.str / 25) * 100}%`;
+            document.getElementById('bar-agi').style.width = `${(localUser.stats.agi / 25) * 100}%`;
+            document.getElementById('bar-int').style.width = `${(localUser.stats.int / 25) * 100}%`;
+            document.getElementById('ui-hp').innerText = localUser.stats.str * 10 + (localUser.level * 20);
+            document.getElementById('ui-dmg').innerText = localUser.stats.str * 2 + (localUser.level * 5);
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) setupPlayer(user);
+            else signInAnonymously(auth);
+        });
+
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
+    </script>
+</body>
+  </html>
