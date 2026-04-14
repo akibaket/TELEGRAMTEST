@@ -3,340 +3,322 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis Tareas (Firebase + Vanilla JS)</title>
-    <!-- Tailwind CSS para el diseño -->
+    <title>Cyberpunk Arena</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Phosphor Icons (alternativa ligera a Lucide para Vanilla JS) -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Estilos personalizados sutiles */
-        body { background-color: #020617; color: #e2e8f0; }
-        .todo-enter { animation: slideIn 0.3s ease-out forwards; }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
+
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-pink: #ff00ff;
+            --dark-bg: #020617;
         }
-        /* Ocultar barra de desplazamiento para un look más limpio en móvil */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        body {
+            background-color: var(--dark-bg);
+            color: #e2e8f0;
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .cyber-font { font-family: 'Orbitron', sans-serif; }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 242, 255, 0.2);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .neon-border {
+            border: 1px solid var(--neon-blue);
+            box-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+        }
+
+        .stat-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .stat-progress {
+            height: 100%;
+            background: linear-gradient(90deg, var(--neon-blue), #3b82f6);
+            box-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        .tab-active {
+            color: var(--neon-blue);
+            border-bottom: 2px solid var(--neon-blue);
+            text-shadow: 0 0 8px var(--neon-blue);
+        }
+
+        /* Animación de escaneo */
+        .scan-line {
+            width: 100%;
+            height: 2px;
+            background: rgba(0, 242, 255, 0.3);
+            position: absolute;
+            top: 0;
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
     </style>
 </head>
-<body class="font-sans antialiased min-h-screen p-4 md:p-8">
+<body class="min-h-screen flex flex-col">
 
-    <!-- Pantalla de Carga Inicial -->
-    <div id="loading-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950">
-        <i class="ph ph-spinner-gap text-4xl text-blue-500 animate-spin mb-4"></i>
-        <p class="text-slate-400">Conectando con Firebase...</p>
+    <!-- Pantalla de Carga -->
+    <div id="loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950">
+        <div class="relative w-24 h-24">
+            <div class="absolute inset-0 border-4 border-t-cyan-500 border-r-transparent border-b-pink-500 border-l-transparent rounded-full animate-spin"></div>
+            <div class="absolute inset-4 border-4 border-t-pink-500 border-r-transparent border-b-cyan-500 border-l-transparent rounded-full animate-spin-reverse animate-[spin_1s_linear_infinite_reverse]"></div>
+        </div>
+        <p class="mt-6 cyber-font text-cyan-400 tracking-widest animate-pulse">SINCRONIZANDO NEURAL LINK...</p>
     </div>
 
-    <!-- Contenedor Principal de la App (Oculto inicialmente) -->
-    <div id="app-container" class="max-w-md mx-auto hidden">
-        
-        <!-- Cabecera -->
-        <div class="flex items-center gap-3 mb-8">
-            <div class="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-900/20">
-                <i class="ph ph-list-checks text-2xl text-white"></i>
+    <!-- Header / Stats Rápidas -->
+    <header class="p-4 flex justify-between items-center border-b border-cyan-900/30 glass-panel sticky top-0 z-40">
+        <div class="flex flex-col">
+            <span class="text-[10px] uppercase tracking-tighter text-cyan-500 cyber-font">Burst Points</span>
+            <div class="flex items-center gap-2">
+                <i class="ph ph-coins text-yellow-400"></i>
+                <span id="player-points" class="text-xl font-bold cyber-font">0</span>
             </div>
-            <h1 class="text-2xl font-bold tracking-tight">Mis Tareas</h1>
         </div>
-
-        <!-- Formulario para Añadir/Editar Tarea -->
-        <form id="todo-form" class="mb-8 relative">
-            <input 
-                type="text" 
-                id="todo-input" 
-                placeholder="Añadir nueva tarea..." 
-                class="w-full bg-slate-900 border border-slate-800 rounded-xl py-4 pl-4 pr-14 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600 text-slate-200"
-                required
-            >
-            <button 
-                type="submit" 
-                id="submit-btn"
-                class="absolute right-2 top-2 bottom-2 bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-lg transition-colors flex items-center justify-center"
-            >
-                <i class="ph ph-plus text-xl" id="submit-icon"></i>
-            </button>
-            
-            <!-- Botón para cancelar edición (oculto por defecto) -->
-            <button 
-                type="button" 
-                id="cancel-edit-btn" 
-                class="hidden mt-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-            >
-                Cancelar edición
-            </button>
-        </form>
-
-        <!-- Lista de Tareas -->
-        <div id="todo-list" class="space-y-3">
-            <!-- Los elementos se inyectarán aquí mediante JS -->
+        <div class="flex flex-col items-end">
+            <span class="text-[10px] uppercase tracking-tighter text-pink-500 cyber-font">Energy</span>
+            <div class="flex items-center gap-2">
+                <span id="player-energy" class="text-xl font-bold cyber-font">0/10</span>
+                <i class="ph ph-lightning-fill text-pink-500"></i>
+            </div>
         </div>
+    </header>
 
-        <!-- Pie de página (Info) -->
-        <div class="mt-8 pt-6 border-t border-slate-900 flex justify-between items-center text-[10px] uppercase tracking-widest text-slate-600">
-            <span id="user-uid">UID: --</span>
-            <span class="flex items-center gap-1">
-                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                Firebase Sync
-            </span>
-        </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- LÓGICA JAVASCRIPT & FIREBASE INTEGRADA -->
-    <!-- ========================================== -->
-    <script type="module">
-        // 1. IMPORTACIONES DE FIREBASE (Módulos ESM)
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            onSnapshot, 
-            doc, 
-            updateDoc, 
-            deleteDoc, 
-            serverTimestamp 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { 
-            getAuth, 
-            signInAnonymously, 
-            signInWithCustomToken, 
-            onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-        // --- ⚠️ ¡ATENCIÓN! PEGA TU CONFIGURACIÓN AQUÍ ⚠️ ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAb6Y2Qoo7e3ceVb-yf8zIuj_grrhll7rM",
-            authDomain: "telegramtest-4279a.firebaseapp.com",
-            projectId: "telegramtest-4279a",
-            storageBucket: "telegramtest-4279a.firebasestorage.app",
-            messagingSenderId: "1006625167364",
-            appId: "1:1006625167364:web:f28361096019df39b37d51"
-};
-
-        // 2. INICIALIZACIÓN
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+    <!-- Contenido Principal -->
+    <main class="flex-1 p-4 pb-24 overflow-y-auto">
         
-        // Variables globales
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'vanilla-todo-app';
-        let currentUser = null;
-        let unsubscribeSnapshot = null;
-        let currentEditingId = null; // Guardará el ID de la tarea si estamos editando
+        <!-- Vista Perfil (Carta de Personaje) -->
+        <section id="view-profile" class="tab-view space-y-6">
+            <div class="relative glass-panel rounded-3xl p-6 overflow-hidden neon-border">
+                <div class="scan-line"></div>
+                
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 id="player-name" class="text-2xl font-bold cyber-font text-white uppercase italic">---</h2>
+                        <span id="player-level" class="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-1 rounded border border-cyan-500/50 cyber-font">LEVEL --</span>
+                    </div>
+                    <div class="text-right">
+                        <i class="ph ph-identification-card text-4xl text-cyan-500/50"></i>
+                    </div>
+                </div>
 
-        // Elementos del DOM
-        const loadingScreen = document.getElementById('loading-screen');
-        const appContainer = document.getElementById('app-container');
-        const todoListEl = document.getElementById('todo-list');
-        const todoForm = document.getElementById('todo-form');
-        const todoInput = document.getElementById('todo-input');
-        const submitIcon = document.getElementById('submit-icon');
-        const cancelEditBtn = document.getElementById('cancel-edit-btn');
-        const userUidEl = document.getElementById('user-uid');
+                <!-- Atributos -->
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs uppercase tracking-widest">
+                            <span>Fuerza (STR)</span>
+                            <span id="stat-str" class="text-cyan-400">0</span>
+                        </div>
+                        <div class="stat-bar"><div id="bar-str" class="stat-progress" style="width: 0%"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs uppercase tracking-widest">
+                            <span>Agilidad (AGI)</span>
+                            <span id="stat-agi" class="text-pink-400">0</span>
+                        </div>
+                        <div class="stat-bar"><div id="bar-agi" class="stat-progress" style="width: 0%; background: #ff00ff; box-shadow: 0 0 10px #ff00ff;"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs uppercase tracking-widest">
+                            <span>Inteligencia (INT)</span>
+                            <span id="stat-int" class="text-purple-400">0</span>
+                        </div>
+                        <div class="stat-bar"><div id="bar-int" class="stat-progress" style="width: 0%; background: #a855f7; box-shadow: 0 0 10px #a855f7;"></div></div>
+                    </div>
+                </div>
 
-        // 3. AUTENTICACIÓN (REGLA 3: Auth antes de Queries)
-        async function initAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+                <!-- Stats Derivadas -->
+                <div class="grid grid-cols-2 gap-3 mt-8 pt-6 border-t border-white/5 text-center">
+                    <div class="p-2 bg-white/5 rounded-xl">
+                        <span class="block text-[10px] text-slate-500 uppercase">Vida (HP)</span>
+                        <span id="stat-hp" class="text-lg font-bold text-green-400 cyber-font">0</span>
+                    </div>
+                    <div class="p-2 bg-white/5 rounded-xl">
+                        <span class="block text-[10px] text-slate-500 uppercase">Daño</span>
+                        <span id="stat-dmg" class="text-lg font-bold text-red-400 cyber-font">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botón Ascender -->
+            <button id="btn-ascend" class="w-full py-4 glass-panel rounded-2xl border-yellow-500/50 text-yellow-500 cyber-font tracking-widest hover:bg-yellow-500/10 transition-all hidden">
+                ASCENDER A NIVEL <span id="next-level">--</span>
+            </button>
+        </section>
+
+        <!-- Vista Arena (Próximamente) -->
+        <section id="view-arena" class="tab-view hidden space-y-4">
+            <h3 class="cyber-font text-xl text-cyan-400 mb-4">Duelistas Disponibles</h3>
+            <div id="arena-list" class="space-y-3">
+                <p class="text-center text-slate-500 italic py-10">Buscando rivales en la red...</p>
+            </div>
+        </section>
+
+        <!-- Vista Ruleta (Próximamente) -->
+        <section id="view-wheel" class="tab-view hidden text-center py-10">
+            <i class="ph ph-spinner-gap text-6xl text-pink-500 animate-spin-slow mb-4"></i>
+            <h3 class="cyber-font text-xl text-pink-500">MÓDULO DE AZAR</h3>
+            <p class="text-slate-400 mt-2">Costo: 50 Puntos</p>
+            <button class="mt-8 px-10 py-3 bg-pink-600 rounded-full cyber-font font-bold">GIRAR</button>
+        </section>
+
+    </main>
+
+    <!-- Navegación Inferior -->
+    <nav class="fixed bottom-0 left-0 right-0 glass-panel border-t border-cyan-900/30 px-6 py-3 flex justify-between items-center z-40">
+        <button onclick="switchTab('profile')" id="nav-profile" class="flex flex-col items-center gap-1 tab-active">
+            <i class="ph ph-user-focus text-2xl"></i>
+            <span class="text-[10px] cyber-font">PERFIL</span>
+        </button>
+        <button onclick="switchTab('arena')" id="nav-arena" class="flex flex-col items-center gap-1 text-slate-500">
+            <i class="ph ph-sword text-2xl"></i>
+            <span class="text-[10px] cyber-font">ARENA</span>
+        </button>
+        <button onclick="switchTab('wheel')" id="nav-wheel" class="flex flex-col items-center gap-1 text-slate-500">
+            <i class="ph ph-clover text-2xl"></i>
+            <span class="text-[10px] cyber-font">RULETA</span>
+        </button>
+    </nav>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // CONFIGURACIÓN FIREBASE
+        const firebaseConfig = {
+           apiKey: "AIzaSyAb6Y2Qoo7e3ceVb-yf8zIuj_grrhll7rM",
+           authDomain: "telegramtest-4279a.firebaseapp.com",
+           projectId: "telegramtest-4279a",
+           storageBucket: "telegramtest-4279a.firebasestorage.app",
+           messagingSenderId: "1006625167364",
+           appId: "1:1006625167364:web:f28361096019df39b37d51"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'burst-clicker-v1';
+
+        let userData = null;
+
+        // --- INICIALIZACIÓN DE JUEGO ---
+        async function initPlayerData(user) {
+            const playerRef = doc(db, "artifacts", APP_ID, "users", user.uid);
+            const playerSnap = await getDoc(playerRef);
+
+            if (!playerSnap.exists()) {
+                // RNG Inicial (5 a 15)
+                const str = Math.floor(Math.random() * 11) + 5;
+                const agi = Math.floor(Math.random() * 11) + 5;
+                const int = Math.floor(Math.random() * 11) + 5;
+
+                const newData = {
+                    username: window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || `Runner_${user.uid.substring(0,4)}`,
+                    points: 100,
+                    level: 1,
+                    energy: 10,
+                    stats: { str, agi, int },
+                    createdAt: serverTimestamp()
+                };
+
+                await setDoc(playerRef, newData);
+                
+                // Registro público para Arena
+                await setDoc(doc(db, "artifacts", APP_ID, "public", "data", "arena_public", user.uid), {
+                    username: newData.username,
+                    level: 1,
+                    lastSeen: serverTimestamp()
+                });
+            }
+
+            // Escuchar cambios en tiempo real
+            onSnapshot(playerRef, (doc) => {
+                if (doc.exists()) {
+                    userData = doc.data();
+                    updateUI();
+                    document.getElementById('loader').classList.add('hidden');
                 }
-            } catch (error) {
-                console.error("Error al autenticar:", error);
-                alert("Error de conexión. Revisa la consola.");
+            });
+        }
+
+        function updateUI() {
+            if (!userData) return;
+
+            // Stats Básicas
+            document.getElementById('player-points').innerText = userData.points;
+            document.getElementById('player-energy').innerText = `${userData.energy}/10`;
+            document.getElementById('player-name').innerText = userData.username;
+            document.getElementById('player-level').innerText = `LEVEL ${userData.level}`;
+
+            // Atributos Base
+            const { str, agi, int } = userData.stats;
+            document.getElementById('stat-str').innerText = str;
+            document.getElementById('stat-agi').innerText = agi;
+            document.getElementById('stat-int').innerText = int;
+
+            // Barras de progreso (máximo visual de 50 para el inicio)
+            document.getElementById('bar-str').style.width = `${(str / 50) * 100}%`;
+            document.getElementById('bar-agi').style.width = `${(agi / 50) * 100}%`;
+            document.getElementById('bar-int').style.width = `${(int / 50) * 100}%`;
+
+            // Stats Derivadas (Fórmulas GDD)
+            const hp = str * 10 + (userData.level * 20);
+            const dmg = str * 2 + (userData.level * 5);
+            document.getElementById('stat-hp').innerText = hp;
+            document.getElementById('stat-dmg').innerText = dmg;
+
+            // Botón Ascender (Si tiene puntos suficientes: 2^level * 100)
+            const cost = Math.pow(2, userData.level) * 100;
+            if (userData.points >= cost && userData.level < 10) {
+                document.getElementById('btn-ascend').classList.remove('hidden');
+                document.getElementById('next-level').innerText = userData.level + 1;
+            } else {
+                document.getElementById('btn-ascend').classList.add('hidden');
             }
         }
 
-        // Escuchar cambios en el estado de autenticación
+        window.switchTab = (tab) => {
+            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active', 'text-slate-500'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.add('text-slate-500'));
+
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            document.getElementById(`nav-${tab}`).classList.add('tab-active');
+            document.getElementById(`nav-${tab}`).classList.remove('text-slate-500');
+        };
+
+        // --- AUTH ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                currentUser = user;
-                userUidEl.textContent = `UID: ${user.uid.substring(0, 8)}...`;
-                loadingScreen.classList.add('hidden');
-                appContainer.classList.remove('hidden');
-                setupRealtimeListener(); // Iniciar la escucha de datos
+                initPlayerData(user);
             } else {
-                currentUser = null;
-                if (unsubscribeSnapshot) unsubscribeSnapshot(); // Limpiar listener
+                signInAnonymously(auth);
             }
         });
 
-        // 4. LECTURA EN TIEMPO REAL (REGLAS 1 y 2)
-        function setupRealtimeListener() {
-            if (!currentUser) return;
-
-            // Ruta privada
-            const todosRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos');
-            
-            // onSnapshot maneja actualizaciones instantáneas
-            unsubscribeSnapshot = onSnapshot(todosRef, (snapshot) => {
-                const todos = [];
-                snapshot.forEach((doc) => {
-                    todos.push({ id: doc.id, ...doc.data() });
-                });
-
-                // Ordenar en memoria por fecha de creación (Evita requerir índices en Firebase)
-                todos.sort((a, b) => {
-                    const timeA = a.createdAt?.seconds || 0;
-                    const timeB = b.createdAt?.seconds || 0;
-                    return timeB - timeA; // Más recientes primero
-                });
-
-                renderTodos(todos);
-            }, (error) => {
-                console.error("Error al obtener datos:", error);
-            });
+        // Telegram Setup
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
         }
-
-        // 5. RENDERIZADO EN EL DOM
-        function renderTodos(todos) {
-            todoListEl.innerHTML = ''; // Limpiar lista actual
-
-            if (todos.length === 0) {
-                todoListEl.innerHTML = `
-                    <div class="py-10 text-center bg-slate-900/50 rounded-2xl border border-dashed border-slate-800 todo-enter">
-                        <p class="text-slate-500 italic">No hay tareas pendientes. ¡Buen trabajo!</p>
-                    </div>
-                `;
-                return;
-            }
-
-            todos.forEach(todo => {
-                const isCompleted = todo.completed;
-                const div = document.createElement('div');
-                div.className = `group flex items-center gap-3 p-4 rounded-xl border transition-all todo-enter ${
-                    isCompleted ? 'bg-slate-900/30 border-slate-800/50 opacity-60' : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-                }`;
-
-                div.innerHTML = `
-                    <button class="toggle-btn transition-colors ${isCompleted ? 'text-green-500' : 'text-slate-600 group-hover:text-slate-400'}" data-id="${todo.id}" data-completed="${isCompleted}">
-                        <i class="ph text-2xl ${isCompleted ? 'ph-check-circle weight-fill' : 'ph-circle'}"></i>
-                    </button>
-                    
-                    <span class="flex-1 text-sm md:text-base ${isCompleted ? 'line-through text-slate-500' : 'text-slate-200'}">
-                        ${escapeHTML(todo.text)}
-                    </span>
-
-                    <div class="flex gap-1">
-                        ${!isCompleted ? `
-                            <button class="edit-btn p-2 text-slate-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all" data-id="${todo.id}" data-text="${escapeHTML(todo.text)}">
-                                <i class="ph ph-pencil-simple text-lg"></i>
-                            </button>
-                        ` : ''}
-                        <button class="delete-btn p-2 text-slate-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all" data-id="${todo.id}">
-                            <i class="ph ph-trash text-lg"></i>
-                        </button>
-                    </div>
-                `;
-                todoListEl.appendChild(div);
-            });
-
-            // Asignar eventos a los botones recién creados
-            attachEventListeners();
-        }
-
-        // 6. ACCIONES: CREAR / EDITAR / ELIMINAR / MARCAR
-        todoForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!currentUser) return;
-
-            const text = todoInput.value.trim();
-            if (!text) return;
-
-            const submitBtn = document.getElementById('submit-btn');
-            submitBtn.disabled = true; // Prevenir doble click
-
-            try {
-                if (currentEditingId) {
-                    // MODO EDICIÓN
-                    const todoRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos', currentEditingId);
-                    await updateDoc(todoRef, { text: text });
-                    exitEditMode();
-                } else {
-                    // MODO CREACIÓN
-                    const todosRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos');
-                    await addDoc(todosRef, {
-                        text: text,
-                        completed: false,
-                        createdAt: serverTimestamp()
-                    });
-                    todoInput.value = '';
-                }
-            } catch (error) {
-                console.error("Error guardando tarea:", error);
-            } finally {
-                submitBtn.disabled = false;
-            }
-        });
-
-        function attachEventListeners() {
-            // Alternar estado (Completado / No completado)
-            document.querySelectorAll('.toggle-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const id = btn.getAttribute('data-id');
-                    const isCompleted = btn.getAttribute('data-completed') === 'true';
-                    const todoRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos', id);
-                    await updateDoc(todoRef, { completed: !isCompleted });
-                });
-            });
-
-            // Eliminar tarea
-            document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const id = btn.getAttribute('data-id');
-                    const todoRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'todos', id);
-                    await deleteDoc(todoRef);
-                });
-            });
-
-            // Iniciar edición
-            document.querySelectorAll('.edit-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const id = btn.getAttribute('data-id');
-                    const text = btn.getAttribute('data-text');
-                    enterEditMode(id, text);
-                });
-            });
-        }
-
-        // Utilidades para Modo Edición
-        function enterEditMode(id, text) {
-            currentEditingId = id;
-            todoInput.value = text;
-            todoInput.focus();
-            submitIcon.className = "ph ph-check text-xl"; // Cambiar icono a 'check'
-            cancelEditBtn.classList.remove('hidden');
-        }
-
-        function exitEditMode() {
-            currentEditingId = null;
-            todoInput.value = '';
-            submitIcon.className = "ph ph-plus text-xl"; // Volver a icono '+'
-            cancelEditBtn.classList.add('hidden');
-        }
-
-        cancelEditBtn.addEventListener('click', exitEditMode);
-
-        // Seguridad básica contra inyección de HTML
-        function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, 
-                tag => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    "'": '&#39;',
-                    '"': '&quot;'
-                }[tag])
-            );
-        }
-
-        // 7. INICIAR LA APP
-        window.onload = initAuth;
 
     </script>
 </body>
