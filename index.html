@@ -21,6 +21,7 @@
             color: #e2e8f0;
             font-family: 'Rajdhani', sans-serif;
             overflow-x: hidden;
+            margin: 0;
         }
 
         .cyber-font { font-family: 'Orbitron', sans-serif; }
@@ -29,18 +30,17 @@
             background: rgba(15, 23, 42, 0.8);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(0, 242, 255, 0.2);
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
         }
 
         .neon-border {
             border: 1px solid var(--neon-blue);
-            box-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
         }
 
         .stat-bar {
-            height: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
             overflow: hidden;
         }
 
@@ -48,21 +48,23 @@
             height: 100%;
             background: linear-gradient(90deg, var(--neon-blue), #3b82f6);
             box-shadow: 0 0 10px var(--neon-blue);
+            transition: width 1s ease-out;
         }
 
         .tab-active {
             color: var(--neon-blue);
             border-bottom: 2px solid var(--neon-blue);
-            text-shadow: 0 0 8px var(--neon-blue);
+            text-shadow: 0 0 10px var(--neon-blue);
         }
 
         .scan-line {
             width: 100%;
             height: 2px;
-            background: rgba(0, 242, 255, 0.3);
+            background: rgba(0, 242, 255, 0.2);
             position: absolute;
             top: 0;
-            animation: scan 3s linear infinite;
+            animation: scan 4s linear infinite;
+            z-index: 10;
         }
 
         @keyframes scan {
@@ -70,178 +72,201 @@
             100% { top: 100%; }
         }
 
-        @keyframes spin-slow {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        .loader-spin {
+            animation: spin 1s linear infinite;
         }
-        .animate-spin-slow { animation: spin-slow 8s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- Pantalla de Carga -->
+    <!-- Cargador Neural -->
     <div id="loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950">
-        <div class="relative w-24 h-24">
-            <div class="absolute inset-0 border-4 border-t-cyan-500 border-r-transparent border-b-pink-500 border-l-transparent rounded-full animate-spin"></div>
-            <div class="absolute inset-4 border-4 border-t-pink-500 border-r-transparent border-b-cyan-500 border-l-transparent rounded-full animate-spin-reverse animate-[spin_1s_linear_infinite_reverse]"></div>
-        </div>
-        <p class="mt-6 cyber-font text-cyan-400 tracking-widest animate-pulse">SINCRONIZANDO NEURAL LINK...</p>
-        <p id="error-message" class="mt-4 text-red-500 hidden text-sm text-center px-4"></p>
+        <div class="w-20 h-20 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full loader-spin"></div>
+        <p class="mt-6 cyber-font text-cyan-400 tracking-widest animate-pulse">SINCRONIZANDO LINK...</p>
+        <p id="error-display" class="mt-4 text-red-500 hidden text-center px-6 text-sm"></p>
     </div>
 
-    <!-- Header / Stats Rápidas -->
-    <header class="p-4 flex justify-between items-center border-b border-cyan-900/30 glass-panel sticky top-0 z-40">
+    <!-- Header Stats -->
+    <header class="p-4 flex justify-between items-center glass-panel border-b border-cyan-900/30 sticky top-0 z-40">
         <div class="flex flex-col">
-            <span class="text-[10px] uppercase tracking-tighter text-cyan-500 cyber-font">Burst Points</span>
+            <span class="text-[10px] text-cyan-500 cyber-font">BURST POINTS</span>
             <div class="flex items-center gap-2">
                 <i class="ph ph-coins text-yellow-400"></i>
-                <span id="player-points" class="text-xl font-bold cyber-font">0</span>
+                <span id="ui-points" class="text-xl font-bold cyber-font">0</span>
             </div>
         </div>
         <div class="flex flex-col items-end">
-            <span class="text-[10px] uppercase tracking-tighter text-pink-500 cyber-font">Energy</span>
+            <span class="text-[10px] text-pink-500 cyber-font">ENERGY</span>
             <div class="flex items-center gap-2">
-                <span id="player-energy" class="text-xl font-bold cyber-font">0/10</span>
+                <span id="ui-energy" class="text-xl font-bold cyber-font">0/10</span>
                 <i class="ph ph-lightning-fill text-pink-500"></i>
             </div>
         </div>
     </header>
 
-    <!-- Contenido Principal -->
-    <main class="flex-1 p-4 pb-24 overflow-y-auto">
+    <!-- App Content -->
+    <main class="flex-1 p-4 pb-24">
         
-        <!-- Vista Perfil -->
-        <section id="view-profile" class="tab-view space-y-6">
+        <!-- Pestaña Perfil -->
+        <section id="tab-profile" class="tab-content space-y-6">
             <div class="relative glass-panel rounded-3xl p-6 overflow-hidden neon-border">
                 <div class="scan-line"></div>
                 
                 <div class="flex justify-between items-start mb-6">
                     <div>
-                        <h2 id="player-name" class="text-2xl font-bold cyber-font text-white uppercase italic">---</h2>
-                        <span id="player-level" class="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-1 rounded border border-cyan-500/50 cyber-font">LEVEL --</span>
+                        <h2 id="ui-username" class="text-2xl font-bold cyber-font text-white italic">---</h2>
+                        <span id="ui-level" class="inline-block mt-1 bg-cyan-950 text-cyan-400 text-[10px] px-2 py-0.5 rounded border border-cyan-500/40 cyber-font">LEVEL --</span>
                     </div>
-                    <div class="text-right">
-                        <i class="ph ph-identification-card text-4xl text-cyan-500/50"></i>
-                    </div>
+                    <i class="ph ph-cpu text-4xl text-cyan-500/30"></i>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4">
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs uppercase tracking-widest">
+                <div class="grid grid-cols-1 gap-5">
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-[11px] uppercase tracking-widest text-slate-400">
                             <span>Fuerza (STR)</span>
-                            <span id="stat-str" class="text-cyan-400">0</span>
+                            <span id="ui-str" class="text-cyan-400 font-bold">0</span>
                         </div>
                         <div class="stat-bar"><div id="bar-str" class="stat-progress" style="width: 0%"></div></div>
                     </div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs uppercase tracking-widest">
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-[11px] uppercase tracking-widest text-slate-400">
                             <span>Agilidad (AGI)</span>
-                            <span id="stat-agi" class="text-pink-400">0</span>
+                            <span id="ui-agi" class="text-pink-400 font-bold">0</span>
                         </div>
                         <div class="stat-bar"><div id="bar-agi" class="stat-progress" style="width: 0%; background: #ff00ff; box-shadow: 0 0 10px #ff00ff;"></div></div>
                     </div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs uppercase tracking-widest">
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-[11px] uppercase tracking-widest text-slate-400">
                             <span>Inteligencia (INT)</span>
-                            <span id="stat-int" class="text-purple-400">0</span>
+                            <span id="ui-int" class="text-purple-400 font-bold">0</span>
                         </div>
                         <div class="stat-bar"><div id="bar-int" class="stat-progress" style="width: 0%; background: #a855f7; box-shadow: 0 0 10px #a855f7;"></div></div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3 mt-8 pt-6 border-t border-white/5 text-center">
-                    <div class="p-2 bg-white/5 rounded-xl">
-                        <span class="block text-[10px] text-slate-500 uppercase">Vida (HP)</span>
-                        <span id="stat-hp" class="text-lg font-bold text-green-400 cyber-font">0</span>
+                <div class="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/5">
+                    <div class="text-center">
+                        <span class="block text-[10px] text-slate-500 uppercase cyber-font">Health (HP)</span>
+                        <span id="ui-hp" class="text-xl font-bold text-green-400 cyber-font">0</span>
                     </div>
-                    <div class="p-2 bg-white/5 rounded-xl">
-                        <span class="block text-[10px] text-slate-500 uppercase">Daño</span>
-                        <span id="stat-dmg" class="text-lg font-bold text-red-400 cyber-font">0</span>
+                    <div class="text-center">
+                        <span class="block text-[10px] text-slate-500 uppercase cyber-font">Attack</span>
+                        <span id="ui-dmg" class="text-xl font-bold text-red-500 cyber-font">0</span>
                     </div>
                 </div>
             </div>
-
-            <button id="btn-ascend" class="w-full py-4 glass-panel rounded-2xl border-yellow-500/50 text-yellow-500 cyber-font tracking-widest hover:bg-yellow-500/10 transition-all hidden">
-                ASCENDER A NIVEL <span id="next-level">--</span>
-            </button>
-        </section>
-
-        <!-- Vista Arena -->
-        <section id="view-arena" class="tab-view hidden space-y-4">
-            <h3 class="cyber-font text-xl text-cyan-400 mb-4 text-center">Duelistas Disponibles</h3>
-            <div id="arena-list" class="space-y-3">
-                <p class="text-center text-slate-500 italic py-10">Buscando rivales en la red...</p>
+            
+            <div id="ascend-container" class="hidden">
+                <button onclick="handleAscend()" class="w-full py-4 glass-panel rounded-2xl border-yellow-600/50 text-yellow-500 cyber-font text-sm tracking-widest active:scale-95 transition-transform">
+                    ASCENDER AL NIVEL <span id="ui-next-level"></span>
+                </button>
+                <p class="text-[10px] text-center text-yellow-600/60 mt-2 uppercase">Cuidado: Perderás tus puntos actuales al subir</p>
             </div>
         </section>
 
-        <!-- Vista Ruleta -->
-        <section id="view-wheel" class="tab-view hidden text-center py-10">
-            <i class="ph ph-spinner-gap text-6xl text-pink-500 animate-spin-slow mb-4 block mx-auto"></i>
-            <h3 class="cyber-font text-xl text-pink-500">MÓDULO DE AZAR</h3>
-            <p class="text-slate-400 mt-2">Costo: 50 Puntos</p>
-            <button class="mt-8 px-10 py-3 bg-pink-600 rounded-full cyber-font font-bold hover:bg-pink-500 transition-colors">GIRAR</button>
+        <!-- Pestaña Arena -->
+        <section id="tab-arena" class="tab-content hidden">
+            <h3 class="cyber-font text-lg text-cyan-400 mb-6 flex items-center gap-2">
+                <i class="ph ph-broadcast"></i> RED DE DUELISTAS
+            </h3>
+            <div id="arena-list" class="space-y-4">
+                <div class="p-8 text-center text-slate-600 animate-pulse cyber-font">Rastreando señales...</div>
+            </div>
+        </section>
+
+        <!-- Pestaña Ruleta -->
+        <section id="tab-wheel" class="tab-content hidden flex flex-col items-center justify-center py-12">
+            <div class="relative w-48 h-48 mb-8">
+                <div class="absolute inset-0 border-8 border-dashed border-pink-500/20 rounded-full animate-[spin_20s_linear_infinite]"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <i class="ph ph-clover text-6xl text-pink-500 opacity-50"></i>
+                </div>
+            </div>
+            <h3 class="cyber-font text-xl text-pink-500">TERMINAL DE FORTUNA</h3>
+            <p class="text-slate-400 text-sm mt-2">Costo: 50 Burst Points</p>
+            <button class="mt-10 px-12 py-3 bg-pink-600 rounded-full cyber-font font-bold shadow-[0_0_20px_rgba(255,0,255,0.4)] active:scale-95">GIRAR</button>
         </section>
 
     </main>
 
-    <!-- Navegación Inferior -->
-    <nav class="fixed bottom-0 left-0 right-0 glass-panel border-t border-cyan-900/30 px-6 py-3 flex justify-between items-center z-40">
-        <button onclick="switchTab('profile')" id="nav-profile" class="flex flex-col items-center gap-1 tab-active">
-            <i class="ph ph-user-focus text-2xl"></i>
-            <span class="text-[10px] cyber-font">PERFIL</span>
+    <!-- Nav Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 glass-panel border-t border-cyan-900/30 px-8 py-4 flex justify-between items-center z-40">
+        <button onclick="changeTab('profile')" id="nav-profile" class="tab-active flex flex-col items-center gap-1">
+            <i class="ph ph-user-circle text-2xl"></i>
+            <span class="text-[9px] cyber-font">ID</span>
         </button>
-        <button onclick="switchTab('arena')" id="nav-arena" class="flex flex-col items-center gap-1 text-slate-500">
+        <button onclick="changeTab('arena')" id="nav-arena" class="text-slate-500 flex flex-col items-center gap-1">
             <i class="ph ph-sword text-2xl"></i>
-            <span class="text-[10px] cyber-font">ARENA</span>
+            <span class="text-[9px] cyber-font">ARENA</span>
         </button>
-        <button onclick="switchTab('wheel')" id="nav-wheel" class="flex flex-col items-center gap-1 text-slate-500">
+        <button onclick="changeTab('wheel')" id="nav-wheel" class="text-slate-500 flex flex-col items-center gap-1">
             <i class="ph ph-clover text-2xl"></i>
-            <span class="text-[10px] cyber-font">RULETA</span>
+            <span class="text-[9px] cyber-font">LUCK</span>
         </button>
     </nav>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection, query, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // CONFIGURACIÓN DINÁMICA
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : { apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: "" };
+        // ==========================================
+        // ⚠️ PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE
+        // ==========================================
+        const firebaseConfig = {
+  apiKey: "AIzaSyAb6Y2Qoo7e3ceVb-yf8zIuj_grrhll7rM",
+  authDomain: "telegramtest-4279a.firebaseapp.com",
+  projectId: "telegramtest-4279a",
+  storageBucket: "telegramtest-4279a.firebasestorage.app",
+  messagingSenderId: "1006625167364",
+  appId: "1:1006625167364:web:f28361096019df39b37d51"
+};
 
+        // Inicialización
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'burst-clicker-v1';
+        
+        let localUser = null;
 
-        let userData = null;
+        // Función para mostrar error
+        const logError = (msg) => {
+            const errEl = document.getElementById('error-display');
+            errEl.innerText = msg;
+            errEl.classList.remove('hidden');
+        };
 
-        // --- MANEJO DE ERRORES ---
-        function showError(msg) {
-            const el = document.getElementById('error-message');
-            el.innerText = msg;
-            el.classList.remove('hidden');
-            console.error(msg);
-        }
+        // Lógica de pestañas
+        window.changeTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(el => {
+                el.classList.remove('tab-active');
+                el.classList.add('text-slate-500');
+            });
 
-        // --- INICIALIZACIÓN DE JUEGO ---
-        async function initPlayerData(user) {
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.getElementById(`nav-${tabId}`).classList.add('tab-active');
+            document.getElementById(`nav-${tabId}`).classList.remove('text-slate-500');
+        };
+
+        // Inicializar Jugador
+        async function setupPlayer(user) {
             try {
-                // Ruta estricta de Firestore para datos privados
-                const playerRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data');
-                const playerSnap = await getDoc(playerRef);
+                // Usamos una ruta simple compatible con cualquier Firebase
+                const pRef = doc(db, "players", user.uid);
+                const pSnap = await getDoc(pRef);
 
-                if (!playerSnap.exists()) {
-                    // Generación RNG (5 a 15)
+                if (!pSnap.exists()) {
+                    // Generar Carta de Personaje (RNG 5-15)
                     const str = Math.floor(Math.random() * 11) + 5;
                     const agi = Math.floor(Math.random() * 11) + 5;
                     const int = Math.floor(Math.random() * 11) + 5;
+                    const tgName = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || `Burst_${user.uid.substring(0,4)}`;
 
-                    const nameFromTG = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name;
-                    
-                    const newData = {
-                        username: nameFromTG || `Runner_${user.uid.substring(0,4)}`,
+                    const initialData = {
+                        uid: user.uid,
+                        username: tgName,
                         points: 100,
                         level: 1,
                         energy: 10,
@@ -249,105 +274,79 @@
                         createdAt: serverTimestamp()
                     };
 
-                    await setDoc(playerRef, newData);
+                    await setDoc(pRef, initialData);
                     
-                    // Registro público para Arena (Ruta pública estricta)
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'arena_public', user.uid), {
-                        username: newData.username,
+                    // Registro público para Arena
+                    await setDoc(doc(db, "arena_list", user.uid), {
+                        username: tgName,
                         level: 1,
-                        lastSeen: serverTimestamp()
+                        uid: user.uid
                     });
                 }
 
-                // Escuchar cambios en tiempo real
-                onSnapshot(playerRef, (snapshot) => {
-                    if (snapshot.exists()) {
-                        userData = snapshot.data();
-                        updateUI();
+                // Escuchar cambios
+                onSnapshot(pRef, (snap) => {
+                    if (snap.exists()) {
+                        localUser = snap.data();
+                        renderUI();
                         document.getElementById('loader').classList.add('hidden');
                     }
-                }, (error) => showError("Error al sincronizar datos: " + error.message));
+                });
 
-            } catch (err) {
-                showError("Fallo en la conexión neural: " + err.message);
+            } catch (e) {
+                logError("Error de sincronización: " + e.message);
             }
         }
 
-        function updateUI() {
-            if (!userData) return;
+        function renderUI() {
+            if (!localUser) return;
 
-            // Elementos de la interfaz
-            document.getElementById('player-points').innerText = userData.points || 0;
-            document.getElementById('player-energy').innerText = `${userData.energy || 0}/10`;
-            document.getElementById('player-name').innerText = userData.username || "---";
-            document.getElementById('player-level').innerText = `LEVEL ${userData.level || 1}`;
+            // Header
+            document.getElementById('ui-points').innerText = localUser.points;
+            document.getElementById('ui-energy').innerText = `${localUser.energy}/10`;
 
-            const { str, agi, int } = userData.stats || { str: 5, agi: 5, int: 5 };
-            document.getElementById('stat-str').innerText = str;
-            document.getElementById('stat-agi').innerText = agi;
-            document.getElementById('stat-int').innerText = int;
+            // Card
+            document.getElementById('ui-username').innerText = localUser.username;
+            document.getElementById('ui-level').innerText = `LEVEL ${localUser.level}`;
+            document.getElementById('ui-str').innerText = localUser.stats.str;
+            document.getElementById('ui-agi').innerText = localUser.stats.agi;
+            document.getElementById('ui-int').innerText = localUser.stats.int;
 
-            // Barras visuales
-            document.getElementById('bar-str').style.width = `${Math.min((str / 30) * 100, 100)}%`;
-            document.getElementById('bar-agi').style.width = `${Math.min((agi / 30) * 100, 100)}%`;
-            document.getElementById('bar-int').style.width = `${Math.min((int / 30) * 100, 100)}%`;
+            // Progress Bars (Base 30 para el inicio)
+            document.getElementById('bar-str').style.width = `${(localUser.stats.str / 30) * 100}%`;
+            document.getElementById('bar-agi').style.width = `${(localUser.stats.agi / 30) * 100}%`;
+            document.getElementById('bar-int').style.width = `${(localUser.stats.int / 30) * 100}%`;
 
-            // Derivadas
-            const hp = str * 10 + (userData.level * 20);
-            const dmg = str * 2 + (userData.level * 5);
-            document.getElementById('stat-hp').innerText = hp;
-            document.getElementById('stat-dmg').innerText = dmg;
+            // Derived
+            document.getElementById('ui-hp').innerText = localUser.stats.str * 10 + (localUser.level * 20);
+            document.getElementById('ui-dmg').innerText = localUser.stats.str * 2 + (localUser.level * 5);
 
-            // Ascenso
-            const cost = Math.pow(2, userData.level) * 100;
-            if (userData.points >= cost && userData.level < 10) {
-                document.getElementById('btn-ascend').classList.remove('hidden');
-                document.getElementById('next-level').innerText = userData.level + 1;
+            // Ascend Logic
+            const cost = Math.pow(2, localUser.level) * 100;
+            if (localUser.points >= cost && localUser.level < 10) {
+                document.getElementById('ascend-container').classList.remove('hidden');
+                document.getElementById('ui-next-level').innerText = localUser.level + 1;
             } else {
-                document.getElementById('btn-ascend').classList.add('hidden');
+                document.getElementById('ascend-container').classList.add('hidden');
             }
         }
 
-        window.switchTab = (tab) => {
-            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
-            document.querySelectorAll('nav button').forEach(b => {
-                b.classList.remove('tab-active');
-                b.classList.add('text-slate-500');
-            });
-
-            document.getElementById(`view-${tab}`).classList.remove('hidden');
-            const btn = document.getElementById(`nav-${tab}`);
-            btn.classList.add('tab-active');
-            btn.classList.remove('text-slate-500');
-        };
-
-        // --- AUTH SISTEMA ---
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                showError("Fallo en la llave de acceso: " + err.message);
-            }
-        };
-
-        initAuth();
-
+        // Auth Listener
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                initPlayerData(user);
+                setupPlayer(user);
+            } else {
+                signInAnonymously(auth).catch(e => logError("Error de autenticación: " + e.message));
             }
         });
 
-        // Telegram Setup
+        // Telegram Integration
         if (window.Telegram?.WebApp) {
             window.Telegram.WebApp.ready();
             window.Telegram.WebApp.expand();
+            window.Telegram.WebApp.headerColor = '#020617';
         }
 
     </script>
 </body>
-            </html>
+</html>
