@@ -77,6 +77,9 @@
                 <div class="flex justify-between items-start mb-4">
                     <div>
                         <h2 id="ui-username" class="text-xl font-bold cyber-font text-white truncate max-w-[150px]">---</h2>
+                        <button id="btn-ascender" onclick="openLevelModal()" class="hidden ml-2 bg-pink-600 text-white text-[9px] px-2 py-1 rounded-md cyber-font animate-pulse hover:bg-pink-500 transition-all">
+                            ASCENDER >>>
+                        </button>
                         <span id="ui-level" class="inline-block bg-cyan-950 text-cyan-400 text-[9px] px-2 py-0.5 rounded border border-cyan-500/30 cyber-font mt-1 uppercase tracking-tighter">Level --</span>
                     </div>
                     <div class="p-2 bg-cyan-500/10 rounded-lg"><i class="ph ph-fingerprint text-2xl text-cyan-500"></i></div>
@@ -138,6 +141,26 @@
         </button>
     </nav>
 
+    <div id="level-modal" class="fixed inset-0 z-[80] hidden bg-slate-950/95 flex items-center justify-center p-6 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-xs rounded-3xl p-6 border-pink-500/50 text-center space-y-5">
+            <div class="w-16 h-16 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center border border-pink-500/30">
+                <i class="ph ph-arrow-fat-up-bold text-3xl text-pink-500"></i>
+            </div>
+            <div>
+                <h3 class="cyber-font text-lg font-bold text-white uppercase tracking-tighter">Protocolo de Ascensión</h3>
+                <p id="level-warning" class="text-[11px] text-slate-400 mt-2 italic leading-relaxed"></p>
+            </div>
+            <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5">
+                <p class="text-[9px] text-slate-500 uppercase cyber-font">Costo de Operación</p>
+                <p id="level-cost-display" class="text-xl font-bold text-pink-400 cyber-font"></p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeLevelModal()" class="flex-1 py-3 bg-slate-800 text-slate-400 rounded-xl cyber-font text-[10px] uppercase font-bold">Abortar</button>
+                <button id="confirm-level-btn" onclick="confirmLevelUp()" class="flex-1 py-3 bg-pink-600 text-white rounded-xl cyber-font text-[10px] uppercase font-bold shadow-[0_0_15px_rgba(219,39,119,0.4)]">Confirmar</button>
+            </div>
+        </div>
+    </div>
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection, query, limit, getDocs, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -296,6 +319,90 @@
 
         window.closeBattleModal = () => document.getElementById('battle-modal').classList.add('hidden');
 
+        // --- SISTEMA DE ASCENSIÓN ---
+
+        // Calcula el costo: Nivel 2 = 200, luego se duplica cada vez
+        const getLevelCost = (nextLevel) => {
+            if (nextLevel <= 1) return 0;
+            return 200 * Math.pow(2, nextLevel - 2);
+        };
+
+        // Abre el modal y configura los textos
+        window.openLevelModal = () => {
+            if (!localUser || localUser.level >= 9) return;
+    
+            const nextLevel = localUser.level + 1;
+            const cost = getLevelCost(nextLevel);
+    
+            document.getElementById('level-warning').innerText = `Estás a punto de subir al NIVEL ${nextLevel}. Se descontarán los puntos de tu balance. Cuidado: un balance bajo te hace vulnerable en la arena.`;
+            document.getElementById('level-cost-display').innerText = `${cost} BP`;
+            document.getElementById('level-modal').classList.remove('hidden');
+        };
+
+        window.closeLevelModal = () => {
+            document.getElementById('level-modal').classList.add('hidden');
+        };
+
+        // Procesa la subida de nivel en Firebase
+        window.confirmLevelUp = async () => {
+            const btn = document.getElementById('confirm-level-btn');
+            const nextLevel = localUser.level + 1;
+            const cost = getLevelCost(nextLevel);
+
+            if (localUser.points < cost) {
+                showMessage("Puntos insuficientes para la ascensión.");
+                closeLevelModal();
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = "PROCESANDO...";
+
+            try {
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', auth.currentUser.uid);
+                const arenaRef = doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', auth.currentUser.uid);
+
+                // Actualizamos nivel y restamos puntos
+                await updateDoc(userRef, {
+                    level: increment(1),
+                    points: increment(-cost)
+                });
+
+                // Actualizamos también su nivel en la lista pública de la arena
+                await updateDoc(arenaRef, {
+                    level: nextLevel
+                });
+
+                closeLevelModal();
+                showMessage(`¡ASCENSIÓN COMPLETADA! Ahora eres Nivel ${nextLevel}`);
+            } catch (e) {
+                console.error("Error en ascensión:", e);
+                showMessage("Error en el enlace neural.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Confirmar";
+            }
+        };
+
+        // Función para verificar si debe aparecer el botón (Llamar esto dentro del onSnapshot de los puntos)
+        const checkLevelUpAvailability = () => {
+            const btn = document.getElementById('btn-ascender');
+            if (!localUser || localUser.level >= 9) {
+                btn.classList.add('hidden');
+                return;
+            }
+
+            const nextLevel = localUser.level + 1;
+            const cost = getLevelCost(nextLevel);
+
+            if (localUser.points >= cost) {
+                btn.classList.remove('hidden');
+            } else {
+                btn.classList.add('hidden');
+            }
+        };
+        
+        
         async function initGame(user) {
             try {
                 // REGLA 1: /artifacts/{appId}/public/data/players/{uid}
@@ -333,6 +440,9 @@
                         document.getElementById('ui-hp').innerText = localUser.stats.str * 10 + (localUser.level * 20);
                         document.getElementById('ui-dmg').innerText = localUser.stats.str * 2 + (localUser.level * 5);
                         document.getElementById('loader').classList.add('hidden');
+
+                        // Dentro del onSnapshot, al final:
+                        checkLevelUpAvailability();
                     }
                 }, (err) => console.error("Error en tiempo real:", err));
 
