@@ -56,7 +56,6 @@
             text-shadow: 0 0 8px var(--neon-blue);
         }
 
-        /* Animación de escaneo */
         .scan-line {
             width: 100%;
             height: 2px;
@@ -70,6 +69,12 @@
             0% { top: 0; }
             100% { top: 100%; }
         }
+
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow { animation: spin-slow 8s linear infinite; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -81,6 +86,7 @@
             <div class="absolute inset-4 border-4 border-t-pink-500 border-r-transparent border-b-cyan-500 border-l-transparent rounded-full animate-spin-reverse animate-[spin_1s_linear_infinite_reverse]"></div>
         </div>
         <p class="mt-6 cyber-font text-cyan-400 tracking-widest animate-pulse">SINCRONIZANDO NEURAL LINK...</p>
+        <p id="error-message" class="mt-4 text-red-500 hidden text-sm text-center px-4"></p>
     </div>
 
     <!-- Header / Stats Rápidas -->
@@ -104,7 +110,7 @@
     <!-- Contenido Principal -->
     <main class="flex-1 p-4 pb-24 overflow-y-auto">
         
-        <!-- Vista Perfil (Carta de Personaje) -->
+        <!-- Vista Perfil -->
         <section id="view-profile" class="tab-view space-y-6">
             <div class="relative glass-panel rounded-3xl p-6 overflow-hidden neon-border">
                 <div class="scan-line"></div>
@@ -119,7 +125,6 @@
                     </div>
                 </div>
 
-                <!-- Atributos -->
                 <div class="grid grid-cols-1 gap-4">
                     <div class="space-y-1">
                         <div class="flex justify-between text-xs uppercase tracking-widest">
@@ -144,7 +149,6 @@
                     </div>
                 </div>
 
-                <!-- Stats Derivadas -->
                 <div class="grid grid-cols-2 gap-3 mt-8 pt-6 border-t border-white/5 text-center">
                     <div class="p-2 bg-white/5 rounded-xl">
                         <span class="block text-[10px] text-slate-500 uppercase">Vida (HP)</span>
@@ -157,26 +161,25 @@
                 </div>
             </div>
 
-            <!-- Botón Ascender -->
             <button id="btn-ascend" class="w-full py-4 glass-panel rounded-2xl border-yellow-500/50 text-yellow-500 cyber-font tracking-widest hover:bg-yellow-500/10 transition-all hidden">
                 ASCENDER A NIVEL <span id="next-level">--</span>
             </button>
         </section>
 
-        <!-- Vista Arena (Próximamente) -->
+        <!-- Vista Arena -->
         <section id="view-arena" class="tab-view hidden space-y-4">
-            <h3 class="cyber-font text-xl text-cyan-400 mb-4">Duelistas Disponibles</h3>
+            <h3 class="cyber-font text-xl text-cyan-400 mb-4 text-center">Duelistas Disponibles</h3>
             <div id="arena-list" class="space-y-3">
                 <p class="text-center text-slate-500 italic py-10">Buscando rivales en la red...</p>
             </div>
         </section>
 
-        <!-- Vista Ruleta (Próximamente) -->
+        <!-- Vista Ruleta -->
         <section id="view-wheel" class="tab-view hidden text-center py-10">
-            <i class="ph ph-spinner-gap text-6xl text-pink-500 animate-spin-slow mb-4"></i>
+            <i class="ph ph-spinner-gap text-6xl text-pink-500 animate-spin-slow mb-4 block mx-auto"></i>
             <h3 class="cyber-font text-xl text-pink-500">MÓDULO DE AZAR</h3>
             <p class="text-slate-400 mt-2">Costo: 50 Puntos</p>
-            <button class="mt-8 px-10 py-3 bg-pink-600 rounded-full cyber-font font-bold">GIRAR</button>
+            <button class="mt-8 px-10 py-3 bg-pink-600 rounded-full cyber-font font-bold hover:bg-pink-500 transition-colors">GIRAR</button>
         </section>
 
     </main>
@@ -199,93 +202,103 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // CONFIGURACIÓN FIREBASE
-        const firebaseConfig = {
-           apiKey: "AIzaSyAb6Y2Qoo7e3ceVb-yf8zIuj_grrhll7rM",
-           authDomain: "telegramtest-4279a.firebaseapp.com",
-           projectId: "telegramtest-4279a",
-           storageBucket: "telegramtest-4279a.firebasestorage.app",
-           messagingSenderId: "1006625167364",
-           appId: "1:1006625167364:web:f28361096019df39b37d51"
-        };
+        // CONFIGURACIÓN DINÁMICA
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : { apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: "" };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'burst-clicker-v1';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'burst-clicker-v1';
 
         let userData = null;
 
+        // --- MANEJO DE ERRORES ---
+        function showError(msg) {
+            const el = document.getElementById('error-message');
+            el.innerText = msg;
+            el.classList.remove('hidden');
+            console.error(msg);
+        }
+
         // --- INICIALIZACIÓN DE JUEGO ---
         async function initPlayerData(user) {
-            const playerRef = doc(db, "artifacts", APP_ID, "users", user.uid);
-            const playerSnap = await getDoc(playerRef);
+            try {
+                // Ruta estricta de Firestore para datos privados
+                const playerRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data');
+                const playerSnap = await getDoc(playerRef);
 
-            if (!playerSnap.exists()) {
-                // RNG Inicial (5 a 15)
-                const str = Math.floor(Math.random() * 11) + 5;
-                const agi = Math.floor(Math.random() * 11) + 5;
-                const int = Math.floor(Math.random() * 11) + 5;
+                if (!playerSnap.exists()) {
+                    // Generación RNG (5 a 15)
+                    const str = Math.floor(Math.random() * 11) + 5;
+                    const agi = Math.floor(Math.random() * 11) + 5;
+                    const int = Math.floor(Math.random() * 11) + 5;
 
-                const newData = {
-                    username: window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || `Runner_${user.uid.substring(0,4)}`,
-                    points: 100,
-                    level: 1,
-                    energy: 10,
-                    stats: { str, agi, int },
-                    createdAt: serverTimestamp()
-                };
+                    const nameFromTG = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name;
+                    
+                    const newData = {
+                        username: nameFromTG || `Runner_${user.uid.substring(0,4)}`,
+                        points: 100,
+                        level: 1,
+                        energy: 10,
+                        stats: { str, agi, int },
+                        createdAt: serverTimestamp()
+                    };
 
-                await setDoc(playerRef, newData);
-                
-                // Registro público para Arena
-                await setDoc(doc(db, "artifacts", APP_ID, "public", "data", "arena_public", user.uid), {
-                    username: newData.username,
-                    level: 1,
-                    lastSeen: serverTimestamp()
-                });
-            }
-
-            // Escuchar cambios en tiempo real
-            onSnapshot(playerRef, (doc) => {
-                if (doc.exists()) {
-                    userData = doc.data();
-                    updateUI();
-                    document.getElementById('loader').classList.add('hidden');
+                    await setDoc(playerRef, newData);
+                    
+                    // Registro público para Arena (Ruta pública estricta)
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'arena_public', user.uid), {
+                        username: newData.username,
+                        level: 1,
+                        lastSeen: serverTimestamp()
+                    });
                 }
-            });
+
+                // Escuchar cambios en tiempo real
+                onSnapshot(playerRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        userData = snapshot.data();
+                        updateUI();
+                        document.getElementById('loader').classList.add('hidden');
+                    }
+                }, (error) => showError("Error al sincronizar datos: " + error.message));
+
+            } catch (err) {
+                showError("Fallo en la conexión neural: " + err.message);
+            }
         }
 
         function updateUI() {
             if (!userData) return;
 
-            // Stats Básicas
-            document.getElementById('player-points').innerText = userData.points;
-            document.getElementById('player-energy').innerText = `${userData.energy}/10`;
-            document.getElementById('player-name').innerText = userData.username;
-            document.getElementById('player-level').innerText = `LEVEL ${userData.level}`;
+            // Elementos de la interfaz
+            document.getElementById('player-points').innerText = userData.points || 0;
+            document.getElementById('player-energy').innerText = `${userData.energy || 0}/10`;
+            document.getElementById('player-name').innerText = userData.username || "---";
+            document.getElementById('player-level').innerText = `LEVEL ${userData.level || 1}`;
 
-            // Atributos Base
-            const { str, agi, int } = userData.stats;
+            const { str, agi, int } = userData.stats || { str: 5, agi: 5, int: 5 };
             document.getElementById('stat-str').innerText = str;
             document.getElementById('stat-agi').innerText = agi;
             document.getElementById('stat-int').innerText = int;
 
-            // Barras de progreso (máximo visual de 50 para el inicio)
-            document.getElementById('bar-str').style.width = `${(str / 50) * 100}%`;
-            document.getElementById('bar-agi').style.width = `${(agi / 50) * 100}%`;
-            document.getElementById('bar-int').style.width = `${(int / 50) * 100}%`;
+            // Barras visuales
+            document.getElementById('bar-str').style.width = `${Math.min((str / 30) * 100, 100)}%`;
+            document.getElementById('bar-agi').style.width = `${Math.min((agi / 30) * 100, 100)}%`;
+            document.getElementById('bar-int').style.width = `${Math.min((int / 30) * 100, 100)}%`;
 
-            // Stats Derivadas (Fórmulas GDD)
+            // Derivadas
             const hp = str * 10 + (userData.level * 20);
             const dmg = str * 2 + (userData.level * 5);
             document.getElementById('stat-hp').innerText = hp;
             document.getElementById('stat-dmg').innerText = dmg;
 
-            // Botón Ascender (Si tiene puntos suficientes: 2^level * 100)
+            // Ascenso
             const cost = Math.pow(2, userData.level) * 100;
             if (userData.points >= cost && userData.level < 10) {
                 document.getElementById('btn-ascend').classList.remove('hidden');
@@ -297,20 +310,35 @@
 
         window.switchTab = (tab) => {
             document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
-            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active', 'text-slate-500'));
-            document.querySelectorAll('nav button').forEach(b => b.classList.add('text-slate-500'));
+            document.querySelectorAll('nav button').forEach(b => {
+                b.classList.remove('tab-active');
+                b.classList.add('text-slate-500');
+            });
 
             document.getElementById(`view-${tab}`).classList.remove('hidden');
-            document.getElementById(`nav-${tab}`).classList.add('tab-active');
-            document.getElementById(`nav-${tab}`).classList.remove('text-slate-500');
+            const btn = document.getElementById(`nav-${tab}`);
+            btn.classList.add('tab-active');
+            btn.classList.remove('text-slate-500');
         };
 
-        // --- AUTH ---
+        // --- AUTH SISTEMA ---
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                showError("Fallo en la llave de acceso: " + err.message);
+            }
+        };
+
+        initAuth();
+
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 initPlayerData(user);
-            } else {
-                signInAnonymously(auth);
             }
         });
 
@@ -322,4 +350,4 @@
 
     </script>
 </body>
-</html>
+                    </html>
