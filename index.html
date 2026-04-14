@@ -144,7 +144,14 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         // Globales del entorno
-        const firebaseConfig = JSON.parse(__firebase_config);
+        const firebaseConfig = {
+            apiKey: "AIzaSyAb6Y2Qoo7e3ceVb-yf8zIuj_grrhll7rM",
+            authDomain: "telegramtest-4279a.firebaseapp.com",
+            projectId: "telegramtest-4279a",
+            storageBucket: "telegramtest-4279a.firebasestorage.app",
+            messagingSenderId: "1006625167364",
+            appId: "1:1006625167364:web:f28361096019df39b37d51"
+        };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
