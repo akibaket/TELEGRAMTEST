@@ -143,8 +143,8 @@
         import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection, query, limit, getDocs, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Globales del entorno
-        const firebaseConfig = {
+        // Globales del entorno o configuración manual (Soporte para GitHub Pages)
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyAb6Y2Qoo7e3ceVb-yf8zIuj_grrhll7rM",
             authDomain: "telegramtest-4279a.firebaseapp.com",
             projectId: "telegramtest-4279a",
@@ -341,7 +341,7 @@
                 document.getElementById('error-display').classList.remove('hidden');
             }
         }
-m
+
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
