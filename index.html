@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Burst Clicker | Cyberpunk Arena</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
+        :root { --neon-blue: #00f2ff; --neon-pink: #ff00ff; --dark-bg: #020617; }
+        body { background-color: var(--dark-bg); color: #e2e8f0; font-family: 'Rajdhani', sans-serif; margin: 0; user-select: none; touch-action: manipulation; }
+        .cyber-font { font-family: 'Orbitron', sans-serif; }
+        .glass-panel { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 242, 255, 0.2); }
+        .neon-border { border: 1px solid var(--neon-blue); box-shadow: 0 0 15px rgba(0, 242, 255, 0.1); }
+        .stat-bar { height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; overflow: hidden; }
+        .stat-progress { height: 100%; background: linear-gradient(90deg, var(--neon-blue), #3b82f6); box-shadow: 0 0 10px var(--neon-blue); transition: width 0.5s ease; }
+        .tab-active { color: var(--neon-blue); border-bottom: 2px solid var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
+        .loader-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .rival-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.2s; }
+        
+        .btn-loading { pointer-events: none; opacity: 0.7; background: #1e293b !important; position: relative; overflow: hidden; }
+        .btn-loading::after { content: ""; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0, 242, 255, 0.2), transparent); animation: loading-scan 1.5s infinite; }
+        @keyframes loading-scan { 100% { left: 100%; } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <div id="loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950">
+        <div class="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full loader-spin"></div>
+        <p class="mt-6 cyber-font text-cyan-400 tracking-widest animate-pulse uppercase text-sm">Sincronizando Neural Link...</p>
+        <p id="error-display" class="mt-4 text-red-500 hidden text-center px-6 text-xs italic font-sans"></p>
+    </div>
+
+    <div id="info-modal" class="fixed inset-0 z-[70] hidden bg-slate-950/90 flex items-center justify-center p-6 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-xs rounded-3xl p-6 text-center space-y-4">
+            <i class="ph ph-warning-circle text-4xl text-yellow-500"></i>
+            <p id="info-message" class="text-sm text-slate-300"></p>
+            <button onclick="closeInfoModal()" class="w-full py-2 bg-slate-800 text-white rounded-xl cyber-font text-[10px] uppercase">Entendido</button>
+        </div>
+    </div>
+
+    <div id="battle-modal" class="fixed inset-0 z-[60] hidden bg-slate-950/95 flex items-center justify-center p-6 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-xs rounded-3xl p-6 border-cyan-500/50 text-center space-y-4">
+            <h3 id="battle-title" class="cyber-font text-xl font-bold uppercase tracking-tighter">RESULTADO</h3>
+            <div class="w-20 h-20 mx-auto bg-slate-900 rounded-full flex items-center justify-center border border-white/10">
+                <i id="battle-icon" class="ph ph-sword text-4xl"></i>
+            </div>
+            <p id="battle-log" class="text-xs text-slate-400 leading-relaxed italic"></p>
+            <div id="battle-reward" class="py-2 px-4 rounded-lg cyber-font text-sm"></div>
+            <button onclick="closeBattleModal()" class="w-full py-3 bg-cyan-600 text-white rounded-xl cyber-font text-xs font-bold tracking-widest uppercase">Continuar</button>
+        </div>
+    </div>
+
+    <header class="p-4 flex justify-between items-center glass-panel border-b border-cyan-900/30 sticky top-0 z-40">
+        <div class="flex flex-col">
+            <span class="text-[9px] text-cyan-500 cyber-font uppercase opacity-70">Burst Points</span>
+            <div class="flex items-center gap-1 font-bold cyber-font">
+                <i class="ph ph-coins text-yellow-400"></i>
+                <span id="ui-points" class="text-lg">0</span>
+            </div>
+        </div>
+        <div class="flex flex-col items-end">
+            <span class="text-[9px] text-pink-500 cyber-font uppercase opacity-70">Neural Energy</span>
+            <div class="flex items-center gap-1 font-bold cyber-font">
+                <span id="ui-energy" class="text-lg">0/10</span>
+                <i class="ph ph-lightning-fill text-pink-500"></i>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 pb-24 overflow-y-auto">
+        <section id="tab-profile" class="tab-content space-y-6">
+            <div class="glass-panel rounded-3xl p-6 neon-border relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 id="ui-username" class="text-xl font-bold cyber-font text-white truncate max-w-[150px]">---</h2>
+                        <span id="ui-level" class="inline-block bg-cyan-950 text-cyan-400 text-[9px] px-2 py-0.5 rounded border border-cyan-500/30 cyber-font mt-1 uppercase tracking-tighter">Level --</span>
+                    </div>
+                    <div class="p-2 bg-cyan-500/10 rounded-lg"><i class="ph ph-fingerprint text-2xl text-cyan-500"></i></div>
+                </div>
+
+                <div class="space-y-4 mt-6">
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] uppercase text-slate-500 tracking-wider"><span>Fuerza</span><span id="ui-str" class="text-cyan-400">0</span></div>
+                        <div class="stat-bar"><div id="bar-str" class="stat-progress" style="width: 0%"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] uppercase text-slate-500 tracking-wider"><span>Agilidad</span><span id="ui-agi" class="text-pink-400">0</span></div>
+                        <div class="stat-bar"><div id="bar-agi" class="stat-progress" style="width: 0%; background: var(--neon-pink);"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] uppercase text-slate-500 tracking-wider"><span>Neuro-Link</span><span id="ui-int" class="text-purple-400">0</span></div>
+                        <div class="stat-bar"><div id="bar-int" class="stat-progress" style="width: 0%; background: #a855f7;"></div></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/5">
+                    <div class="text-center">
+                        <span class="block text-[9px] text-slate-500 cyber-font uppercase tracking-tighter">Vitalidad</span>
+                        <span id="ui-hp" class="text-lg font-bold text-green-400 cyber-font">0</span>
+                    </div>
+                    <div class="text-center">
+                        <span class="block text-[9px] text-slate-500 cyber-font uppercase tracking-tighter">Potencia</span>
+                        <span id="ui-dmg" class="text-lg font-bold text-red-500 cyber-font">0</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-arena" class="tab-content hidden space-y-4">
+            <h3 class="cyber-font text-[10px] text-cyan-400 px-2 tracking-widest uppercase opacity-70">Red de Duelos Detectada</h3>
+            <div id="arena-list" class="space-y-3"></div>
+        </section>
+
+        <section id="tab-wheel" class="tab-content hidden py-20 text-center">
+            <div class="opacity-30 space-y-4">
+                <i class="ph ph-lock-key text-6xl block mx-auto"></i>
+                <p class="cyber-font text-[10px] uppercase tracking-widest">Módulo de Suerte Bloqueado</p>
+            </div>
+        </section>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 glass-panel border-t border-cyan-900/30 px-6 py-3 flex justify-between items-center z-40">
+        <button onclick="changeTab('profile')" id="nav-profile" class="tab-active flex flex-col items-center gap-1 flex-1">
+            <i class="ph ph-user-focus text-2xl"></i>
+            <span class="text-[8px] cyber-font uppercase">Perfil</span>
+        </button>
+        <button onclick="changeTab('arena')" id="nav-arena" class="text-slate-600 flex flex-col items-center gap-1 flex-1">
+            <i class="ph ph-sword text-2xl"></i>
+            <span class="text-[8px] cyber-font uppercase">Arena</span>
+        </button>
+        <button onclick="changeTab('wheel')" id="nav-wheel" class="text-slate-600 flex flex-col items-center gap-1 flex-1">
+            <i class="ph ph-clover text-2xl"></i>
+            <span class="text-[8px] cyber-font uppercase">Suerte</span>
+        </button>
+    </nav>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection, query, limit, getDocs, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Globales del entorno
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'burst-clicker-game';
+        
+        let localUser = null;
+        let isProcessingBattle = false;
+
+        const showMessage = (msg) => {
+            document.getElementById('info-message').innerText = msg;
+            document.getElementById('info-modal').classList.remove('hidden');
+        };
+        window.closeInfoModal = () => document.getElementById('info-modal').classList.add('hidden');
+
+        window.changeTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(el => {
+                el.classList.remove('tab-active');
+                el.classList.add('text-slate-600');
+            });
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const navBtn = document.getElementById(`nav-${tabId}`);
+            if(navBtn) {
+                navBtn.classList.add('tab-active');
+                navBtn.classList.remove('text-slate-600');
+            }
+            if (tabId === 'arena') loadArena();
+        };
+
+        async function loadArena() {
+            const listEl = document.getElementById('arena-list');
+            listEl.innerHTML = '<div class="py-10 text-center text-[10px] text-cyan-700 cyber-font animate-pulse uppercase tracking-widest">Escaneando sector...</div>';
+            
+            try {
+                // REGLA 1: /artifacts/{appId}/public/data/{collection}
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'arena_list'), limit(15));
+                const snap = await getDocs(q);
+                listEl.innerHTML = '';
+                
+                if(snap.empty) {
+                    listEl.innerHTML = '<p class="text-center text-slate-600 text-xs py-10">Sector sin actividad. Sé el primero.</p>';
+                    return;
+                }
+
+                snap.forEach(docSnap => {
+                    const rival = docSnap.data();
+                    if(rival.uid === auth.currentUser?.uid) return;
+
+                    const div = document.createElement('div');
+                    div.className = 'rival-card p-4 rounded-2xl flex justify-between items-center border border-white/5';
+                    div.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-slate-900 border border-cyan-500/20 flex items-center justify-center text-cyan-500">
+                                <i class="ph ph-shield-chevron"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold cyber-font uppercase text-white">${rival.username}</div>
+                                <div class="text-[9px] text-cyan-600 cyber-font uppercase tracking-tighter">LV.${rival.level} • BURST READY</div>
+                            </div>
+                        </div>
+                        <button id="btn-${rival.uid}" onclick="startDuel('${rival.uid}')" class="bg-cyan-600 text-white text-[9px] font-bold px-4 py-2 rounded-lg cyber-font uppercase tracking-widest hover:bg-cyan-500 transition-colors">Retar</button>
+                    `;
+                    listEl.appendChild(div);
+                });
+            } catch (e) { console.error("Error cargando Arena:", e); }
+        }
+
+        window.startDuel = async (rivalUid) => {
+            if (isProcessingBattle || !localUser) return;
+            if (localUser.energy <= 0) {
+                showMessage("Energía crítica. Espera a la recarga neural.");
+                return;
+            }
+
+            const btn = document.getElementById(`btn-${rivalUid}`);
+            const originalText = btn?.innerText || "Retar";
+            
+            isProcessingBattle = true;
+            if(btn) {
+                btn.innerText = "LINKING...";
+                btn.classList.add('btn-loading');
+            }
+
+            try {
+                // Obtener datos del rival desde ruta pública (REGLA 1)
+                const rivalRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', rivalUid);
+                const rivalSnap = await getDoc(rivalRef);
+                
+                if (!rivalSnap.exists()) { throw new Error("Rival no encontrado en el servidor."); }
+                const rival = rivalSnap.data();
+
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                const myPower = (localUser.stats.str * 1.5) + (localUser.stats.agi * 1.2) + (localUser.level * 5);
+                const rivalPower = (rival.stats.str * 1.5) + (rival.stats.agi * 1.2) + (rival.level * 5);
+                const myLuck = 0.8 + (Math.random() * 0.7);
+                const rivalLuck = 0.8 + (Math.random() * 0.7);
+
+                const win = (myPower * myLuck) > (rivalPower * rivalLuck);
+                let pointsChange = win ? 50 : -10;
+                
+                // Bono por diferencia de nivel (si ganas a alguien más fuerte)
+                if (win && rival.level > localUser.level) {
+                    pointsChange += (rival.level - localUser.level) * 15;
+                }
+                
+                const finalPoints = Math.max(0, localUser.points + pointsChange);
+
+                // Guardar resultado (REGLA 1)
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', auth.currentUser.uid);
+                await updateDoc(userRef, {
+                    energy: increment(-1),
+                    points: finalPoints
+                });
+
+                // UI Modal
+                const modalIcon = document.getElementById('battle-icon');
+                const rewardBox = document.getElementById('battle-reward');
+                
+                document.getElementById('battle-modal').classList.remove('hidden');
+                document.getElementById('battle-title').innerText = win ? "Victoria" : "Derrota";
+                document.getElementById('battle-title').className = `cyber-font text-2xl font-bold ${win ? 'text-green-400' : 'text-red-500'}`;
+                
+                modalIcon.className = win ? "ph ph-trophy text-4xl text-green-400" : "ph ph-skull text-4xl text-red-500";
+                rewardBox.innerText = win ? `+${pointsChange} Burst Points` : `${pointsChange} Burst Points`;
+                rewardBox.className = `py-2 px-4 rounded-lg cyber-font text-sm ${win ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`;
+                
+                document.getElementById('battle-log').innerText = win 
+                    ? `Sincronización perfecta. Has extraído datos valiosos de ${rival.username}.`
+                    : `Sobrecarga del sistema. ${rival.username} ha interceptado tus créditos.`;
+
+            } catch (e) { 
+                showMessage("Fallo de combate: " + e.message);
+            } finally {
+                isProcessingBattle = false;
+                if(btn) {
+                    btn.innerText = originalText;
+                    btn.classList.remove('btn-loading');
+                }
+            }
+        };
+
+        window.closeBattleModal = () => document.getElementById('battle-modal').classList.add('hidden');
+
+        async function initGame(user) {
+            try {
+                // REGLA 1: /artifacts/{appId}/public/data/players/{uid}
+                const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+                const pSnap = await getDoc(pRef);
+
+                if (!pSnap.exists()) {
+                    const stats = {
+                        str: Math.floor(Math.random() * 8) + 5,
+                        agi: Math.floor(Math.random() * 8) + 5,
+                        int: Math.floor(Math.random() * 8) + 5
+                    };
+                    const name = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || "Runner_" + user.uid.slice(0,4);
+                    const data = { uid: user.uid, username: name, points: 100, level: 1, energy: 10, stats, createdAt: serverTimestamp() };
+                    
+                    await setDoc(pRef, data);
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', user.uid), { 
+                        username: name, level: 1, uid: user.uid 
+                    });
+                }
+
+                onSnapshot(pRef, (snap) => {
+                    if (snap.exists()) {
+                        localUser = snap.data();
+                        document.getElementById('ui-points').innerText = Math.floor(localUser.points);
+                        document.getElementById('ui-energy').innerText = `${localUser.energy}/10`;
+                        document.getElementById('ui-username').innerText = localUser.username;
+                        document.getElementById('ui-level').innerText = `LEVEL ${localUser.level}`;
+                        document.getElementById('ui-str').innerText = localUser.stats.str;
+                        document.getElementById('ui-agi').innerText = localUser.stats.agi;
+                        document.getElementById('ui-int').innerText = localUser.stats.int;
+                        document.getElementById('bar-str').style.width = `${(localUser.stats.str / 40) * 100}%`;
+                        document.getElementById('bar-agi').style.width = `${(localUser.stats.agi / 40) * 100}%`;
+                        document.getElementById('bar-int').style.width = `${(localUser.stats.int / 40) * 100}%`;
+                        document.getElementById('ui-hp').innerText = localUser.stats.str * 10 + (localUser.level * 20);
+                        document.getElementById('ui-dmg').innerText = localUser.stats.str * 2 + (localUser.level * 5);
+                        document.getElementById('loader').classList.add('hidden');
+                    }
+                }, (err) => console.error("Error en tiempo real:", err));
+
+            } catch (e) { 
+                document.getElementById('error-display').innerText = "Error de Red Burst: " + e.message;
+                document.getElementById('error-display').classList.remove('hidden');
+            }
+        }
+m
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Fallo de Autenticación:", error);
+            }
+        };
+
+        initAuth();
+        onAuthStateChanged(auth, (user) => {
+            if (user) initGame(user);
+        });
+
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
+    </script>
+</body>
+</html>
