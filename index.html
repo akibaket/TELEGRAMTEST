@@ -77,9 +77,9 @@
                 <div class="flex justify-between items-start mb-4">
                     <div>
                         <h2 id="ui-username" class="text-xl font-bold cyber-font text-white truncate max-w-[150px]">---</h2>
-                        <button id="btn-ascender" onclick="openLevelModal()" class="hidden ml-2 bg-pink-600 text-white text-[9px] px-2 py-1 rounded-md cyber-font animate-pulse hover:bg-pink-500 transition-all">
+                        <span><button id="btn-ascender" onclick="openLevelModal()" class="hidden ml-2 bg-pink-600 text-white text-[9px] px-2 py-1 rounded-md cyber-font animate-pulse hover:bg-pink-500 transition-all">
                             ASCENDER >>>
-                        </button>
+                        </button></span>
                         <span id="ui-level" class="inline-block bg-cyan-950 text-cyan-400 text-[9px] px-2 py-0.5 rounded border border-cyan-500/30 cyber-font mt-1 uppercase tracking-tighter">Level --</span>
                     </div>
                     <div class="p-2 bg-cyan-500/10 rounded-lg"><i class="ph ph-fingerprint text-2xl text-cyan-500"></i></div>
@@ -441,11 +441,13 @@
                         document.getElementById('ui-dmg').innerText = localUser.stats.str * 2 + (localUser.level * 5);
                         document.getElementById('loader').classList.add('hidden');
 
+                        checkDailyEnergy();
+
                         // Dentro del onSnapshot, al final:
                         checkLevelUpAvailability();
                     }
                 }, (err) => console.error("Error en tiempo real:", err));
-
+                setInterval(checkDailyEnergy, 60000);
             } catch (e) { 
                 document.getElementById('error-display').innerText = "Error de Red Burst: " + e.message;
                 document.getElementById('error-display').classList.remove('hidden');
@@ -473,6 +475,38 @@
             window.Telegram.WebApp.ready();
             window.Telegram.WebApp.expand();
         }
+
+        // --- SISTEMA DE RECARGA DIARIA (00:00 UTC) ---
+        window.checkDailyEnergy = async () => {
+            // Si no hay usuario cargado, no hacemos nada
+            if (!localUser || !auth.currentUser) return;
+
+            // 1. Obtenemos la fecha actual exacta en UTC (Formato: YYYY-MM-DD)
+            const now = new Date();
+            const todayUTC = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+
+            // 2. Comprobamos si es un día nuevo en el servidor
+            if (localUser.lastEnergyReset !== todayUTC) {
+                try {
+                    const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', auth.currentUser.uid);
+            
+                    // Actualizamos la energía a 10 y guardamos el día de hoy para no volver a dársela
+                    await updateDoc(userRef, {
+                        energy: 10,
+                        lastEnergyReset: todayUTC
+                    });
+            
+                    console.log("Sistema: Energía diaria restaurada (00:00 UTC).");
+            
+                    // Opcional: Mostramos una alerta estética si el usuario estaba jugando en ese momento
+                    if (localUser.lastEnergyReset !== undefined) {
+                        showMessage("¡Un nuevo ciclo ha comenzado! Tu Energía Neural ha sido restaurada al máximo.");
+                    }
+                } catch (e) {
+                    console.error("Fallo al restaurar energía diaria:", e);
+                }
+            }
+        };
     </script>
 </body>
 </html>
