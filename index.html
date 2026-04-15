@@ -160,6 +160,29 @@
             </div>
         </div>
     </div>
+
+    <div id="gameover-modal" class="fixed inset-0 z-[100] hidden bg-red-950/95 flex items-center justify-center p-6 backdrop-blur-xl">
+        <div class="glass-panel w-full max-w-xs rounded-3xl p-8 border-red-500/50 text-center space-y-6 shadow-[0_0_50px_rgba(239,68,68,0.3)]">
+            <div class="relative">
+                <i class="ph ph-skull text-6xl text-red-600 animate-bounce"></i>
+                    <div class="absolute inset-0 bg-red-500 blur-2xl opacity-20"></div>
+                </div>
+        
+                <div>
+                    <h3 class="cyber-font text-2xl font-bold text-red-500 uppercase tracking-tighter">CONEXIÓN PERDIDA</h3>
+                    <p class="text-[12px] text-slate-400 mt-2 italic leading-relaxed">Tu enlace neural ha colapsado. Tus créditos han llegado a cero y el sistema ha purgado tu perfil.</p>
+                </div>
+
+                <div class="bg-red-950/40 p-4 rounded-xl border border-red-500/20">
+                    <p class="text-[10px] text-red-400 uppercase cyber-font font-bold">Estado: GAME OVER</p>
+                    <p class="text-[9px] text-slate-500 uppercase cyber-font">Progreso Reiniciado al Nivel 1</p>
+                </div>
+
+                <button onclick="rebootSystem()" class="w-full py-4 bg-red-600 text-white rounded-xl cyber-font text-xs font-bold tracking-[0.2em] uppercase shadow-[0_0_20px_rgba(220,38,38,0.5)] active:scale-95 transition-transform">
+                    REINICIAR SISTEMA
+                </button>
+            </div>
+        </div>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -445,6 +468,8 @@
 
                         // Dentro del onSnapshot, al final:
                         checkLevelUpAvailability();
+
+                        checkGameOver();
                     }
                 }, (err) => console.error("Error en tiempo real:", err));
                 setInterval(checkDailyEnergy, 60000);
@@ -505,6 +530,51 @@
                 } catch (e) {
                     console.error("Fallo al restaurar energía diaria:", e);
                 }
+            }
+        };
+
+        // --- SISTEMA DE GAME OVER ---
+
+        window.checkGameOver = async () => {
+            // Solo actuamos si el usuario tiene 0 o menos puntos y aún no estamos en nivel 1
+            if (localUser && localUser.points <= 0) {
+                document.getElementById('gameover-modal').classList.remove('hidden');
+            }
+        };
+
+        window.rebootSystem = async () => {
+            const btn = document.querySelector('#gameover-modal button');
+            btn.disabled = true;
+            btn.innerText = "BORRANDO DATOS...";
+
+            try {
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', auth.currentUser.uid);
+                const arenaRef = doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', auth.currentUser.uid);
+
+                // Reinicio total de estadísticas y nivel
+                const resetData = {
+                    level: 1,
+                    points: 100, // Le damos 100 puntos iniciales para que pueda volver a empezar
+                    energy: 10,
+                    stats: {
+                        str: Math.floor(Math.random() * 5) + 5,
+                        agi: Math.floor(Math.random() * 5) + 5,
+                        int: Math.floor(Math.random() * 5) + 5
+                    }
+                };
+
+                await updateDoc(userRef, resetData);
+                await updateDoc(arenaRef, { level: 1 });
+
+                document.getElementById('gameover-modal').classList.add('hidden');
+                showMessage("Sistema reiniciado. Runner de Nivel 1 detectado.");
+        
+            } catch (e) {
+                console.error("Fallo en el reinicio:", e);
+                alert("Error crítico al intentar reiniciar el sistema.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "REINICIAR SISTEMA";
             }
         };
     </script>
