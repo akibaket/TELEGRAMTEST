@@ -352,7 +352,6 @@
                 await updateDoc(userRef, {
                     energy: increment(-1),
                     points: finalPoints
-                    dailyWins: win ? increment(1);
                 });
 
                 // UI Modal
@@ -506,6 +505,8 @@
                         document.getElementById('ui-dmg').innerText = localUser.stats.str * 2 + (localUser.level * 5);
                         document.getElementById('loader').classList.add('hidden');
                         document.getElementById('ui-usdt').innerText = (localUser.usdt || 0).toFixed(2);
+
+                        renderTasks();
                         
                         // Y llama a drawWheel por si el canvas no se ha pintado
                         drawWheel();
@@ -517,7 +518,7 @@
 
                         checkGameOver();
 
-                        renderTasks();
+                        
                     }
                 }, (err) => console.error("Error en tiempo real:", err));
                 setInterval(checkDailyEnergy, 60000);
