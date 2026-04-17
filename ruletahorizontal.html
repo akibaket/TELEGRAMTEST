@@ -25,9 +25,9 @@
         .btn-loading::after { content: ""; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0, 242, 255, 0.2), transparent); animation: loading-scan 1.5s infinite; }
         @keyframes loading-scan { 100% { left: 100%; } }
 
-      /* El riel de animación - La curva cubic-bezier crea el efecto de "fricción" */
+      /* Aseguramos que la transición gane a cualquier otro estilo */
 .gacha-spin-animation {
-    transition: transform 6s cubic-bezier(0.15, 0.85, 0.1, 1);
+    transition: transform 6s cubic-bezier(0.15, 0.85, 0.1, 1) !important;
 }
 
 /* La tarjeta individual de cada premio */
@@ -706,65 +706,41 @@ window.startGachaExtraction = async () => {
     const btn = document.getElementById('btn-spin');
     
     btn.innerText = "EXTRAYENDO...";
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
-    track.style.transition = 'none'; // Reseteamos la animación anterior
+    // --- FIX INICIO ---
+    // 1. Quitamos la clase de animación y el estilo de transición previo
+    track.classList.remove('gacha-spin-animation');
+    track.style.transition = 'none'; 
     track.style.transform = 'translateX(0px)';
-
-    // 2. Determinar el premio ganador (Aquí podrías conectar tus probabilidades de Firebase)
-    // Para el ejemplo, elegimos uno al azar del pool:
-    const winnerIndexLogic = Math.floor(Math.random() * prizesPool.length);
-    const winnerItem = prizesPool[winnerIndexLogic];
-
-    // 3. Construir la "Cinta" visual
-    // Creamos 40 items de relleno, y el item 41 es nuestro ganador.
-    const WINNING_SLOT = 40; 
-    const TOTAL_ITEMS = 45; // Unos cuantos más para que no se acabe la cinta de golpe
     
+    // 2. Generamos el contenido (esto se queda igual)
+    const WINNING_SLOT = 40; 
+    const winnerItem = prizesPool[Math.floor(Math.random() * prizesPool.length)];
     let trackHTML = '';
-    for (let i = 0; i < TOTAL_ITEMS; i++) {
-        // Asignamos un item aleatorio al relleno, o el ganador en la posición clave
+    for (let i = 0; i < 45; i++) {
         const item = (i === WINNING_SLOT) ? winnerItem : prizesPool[Math.floor(Math.random() * prizesPool.length)];
-        
         trackHTML += `
             <div class="gacha-item ${item.rarity}" id="slot-${i}">
-                <div class="text-2xl mb-1">${item.icon}</div>
-                <div class="text-[10px] font-bold uppercase tracking-wider">${item.name}</div>
-            </div>
-        `;
+                <div class="text-2xl">${item.icon}</div>
+                <div class="text-[10px] font-bold uppercase">${item.name}</div>
+            </div>`;
     }
     track.innerHTML = trackHTML;
 
-    // 4. Matemáticas de la inercia (Forzamos un reflow para que CSS aplique el reset)
-    void track.offsetWidth; 
-
-    // Calculamos el ancho de cada tarjeta + sus márgenes (90px ancho + 4px margin L + 4px margin R = 98px)
-    const itemWidth = 98; 
-    const containerWidth = track.parentElement.clientWidth;
-    
-    // Posición para que el WINNING_SLOT quede en el centro de la pantalla
-    // Desplazamiento = (Mitad del contenedor) - (Posición de inicio de la tarjeta) - (Mitad de la tarjeta)
-    const targetX = (containerWidth / 2) - (WINNING_SLOT * itemWidth) - (itemWidth / 2);
-    
-    // Añadimos una pequeña variación aleatoria (-20px a +20px) para que no siempre caiga en el centro milimétrico perfecto
-    const randomOffset = Math.floor(Math.random() * 40) - 20;
-    const finalTransform = targetX + randomOffset;
-
-    // 5. ¡A girar!
-    track.classList.add('gacha-spin-animation');
-    track.style.transform = `translateX(${finalTransform}px)`;
-
-    // 6. Finalizar y entregar el premio
-    setTimeout(async () => {
-        // Iluminar el ganador
-        document.getElementById(`slot-${WINNING_SLOT}`).classList.add('winner-highlight');
-        
-        btn.innerText = `¡GANASTE ${winnerItem.name}!`;
-        btn.classList.replace('border-cyan-500', 'border-fuchsia-500');
-        btn.classList.replace('text-cyan-400', 'text-fuchsia-400');
-        
-        // Aquí interactúas de nuevo con Firebase para sumar el premio
-        // await updateDoc(userRef, { [winnerItem.type]: increment(winnerItem.amount) });
-        
+    // 3. El truco del "Doble Frame": Forzamos al navegador a entender que estamos en 0px 
+    // antes de pedirle que se mueva a la posición final con animación.
+    requestAnimationFrame(() => {
+        void track.offsetWidth; // Reflow forzado
+        requestAnimationFrame(() => {
+            const itemWidth = 98; 
+            const targetX = (track.parentElement.clientWidth / 2) - (WINNING_SLOT * itemWidth) - (itemWidth / 2);
+            
+            // Aplicamos la clase y el movimiento
+            track.classList.add('gacha-spin-animation');
+            track.style.transition = ''; // Limpiamos el 'none' para que la clase CSS mande
+            track.style.transform = `translateX(${targetX}px)`;
+        });
+    });
+    // --- FIX FIN ---
         setTimeout(() => {
             isSpinning = false;
             btn.innerText = "INICIAR EXTRACCIÓN (-50 BP)";
