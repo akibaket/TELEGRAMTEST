@@ -429,9 +429,9 @@
                 // Actualizamos nivel y restamos puntos
                 await updateDoc(userRef, {
                     level: increment(1),
-                    agi: increment(1 * level),
-                    int: increment(1 * level),
-                    str: increment(1 * level),
+                    "stats.str": increment(level),
+                    "stats.agi": increment(level),
+                    "stats.int": increment(level)
                     points: increment(-cost)
                 });
 
