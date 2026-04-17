@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyberpunk Arena</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
+        :root { --neon-blue: #00f2ff; --neon-pink: #ff00ff; --dark-bg: #020617; }
+        body { background-color: var(--dark-bg); color: #e2e8f0; font-family: 'Rajdhani', sans-serif; margin: 0; user-select: none; touch-action: manipulation; }
+        .cyber-font { font-family: 'Orbitron', sans-serif; }
+        .glass-panel { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0, 242, 255, 0.2); }
+        .neon-border { border: 1px solid var(--neon-blue); box-shadow: 0 0 15px rgba(0, 242, 255, 0.1); }
+        .stat-bar { height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; overflow: hidden; }
+        .stat-progress { height: 100%; background: linear-gradient(90deg, var(--neon-blue), #3b82f6); box-shadow: 0 0 10px var(--neon-blue); transition: width 0.5s ease; }
+        .tab-active { color: var(--neon-blue); border-bottom: 2px solid var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
+        .loader-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .rival-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.2s; }
+        
+        .btn-loading { pointer-events: none; opacity: 0.7; background: #1e293b !important; position: relative; overflow: hidden; }
+        .btn-loading::after { content: ""; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(0, 242, 255, 0.2), transparent); animation: loading-scan 1.5s infinite; }
+        @keyframes loading-scan { 100% { left: 100%; } }
+
+      /* El riel de animación - La curva cubic-bezier crea el efecto de "fricción" */
+.gacha-spin-animation {
+    transition: transform 6s cubic-bezier(0.15, 0.85, 0.1, 1);
+}
+
+/* La tarjeta individual de cada premio */
+.gacha-item {
+    width: 90px;
+    height: 80px;
+    margin: 0 4px;
+    flex-shrink: 0;
+    background: rgba(0, 255, 255, 0.05);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0.6;
+    transition: all 0.3s ease;
+}
+
+/* Clases de rareza para los bordes y textos */
+.rarity-common { border-color: #94a3b8; color: #94a3b8; }
+.rarity-rare { border-color: #06b6d4; color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
+.rarity-epic { border-color: #d946ef; color: #d946ef; background: rgba(217, 70, 239, 0.1); }
+.rarity-legendary { border-color: #eab308; color: #eab308; background: rgba(234, 179, 8, 0.1); box-shadow: 0 0 10px rgba(234, 179, 8, 0.4); }
+
+.gacha-item.winner-highlight {
+    opacity: 1;
+    transform: scale(1.1);
+    box-shadow: 0 0 15px currentColor;
+    z-index: 30;
+}
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <div id="loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950">
+        <div class="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full loader-spin"></div>
+        <p class="mt-6 cyber-font text-cyan-400 tracking-widest animate-pulse uppercase text-sm">Sincronizando Neural Link...</p>
+        <p id="error-display" class="mt-4 text-red-500 hidden text-center px-6 text-xs italic font-sans"></p>
+    </div>
+
+    <div id="info-modal" class="fixed inset-0 z-[70] hidden bg-slate-950/90 flex items-center justify-center p-6 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-xs rounded-3xl p-6 text-center space-y-4">
+            <i class="ph ph-warning-circle text-4xl text-yellow-500"></i>
+            <p id="info-message" class="text-sm text-slate-300"></p>
+            <button onclick="closeInfoModal()" class="w-full py-2 bg-slate-800 text-white rounded-xl cyber-font text-[10px] uppercase">Entendido</button>
+        </div>
+    </div>
+
+    <div id="battle-modal" class="fixed inset-0 z-[60] hidden bg-slate-950/95 flex items-center justify-center p-6 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-xs rounded-3xl p-6 border-cyan-500/50 text-center space-y-4">
+            <h3 id="battle-title" class="cyber-font text-xl font-bold uppercase tracking-tighter">RESULTADO</h3>
+            <div class="w-20 h-20 mx-auto bg-slate-900 rounded-full flex items-center justify-center border border-white/10">
+                <i id="battle-icon" class="ph ph-sword text-4xl"></i>
+            </div>
+            <p id="battle-log" class="text-xs text-slate-400 leading-relaxed italic"></p>
+            <div id="battle-reward" class="py-2 px-4 rounded-lg cyber-font text-sm"></div>
+            <button onclick="closeBattleModal()" class="w-full py-3 bg-cyan-600 text-white rounded-xl cyber-font text-xs font-bold tracking-widest uppercase">Continuar</button>
+        </div>
+    </div>
+
+    <header class="p-4 flex justify-between items-center glass-panel border-b border-cyan-900/30 sticky top-0 z-40">
+        <div class="flex flex-col">
+            <span class="text-[9px] text-cyan-500 cyber-font uppercase opacity-70">Burst Points</span>
+            <div class="flex items-center gap-1 font-bold cyber-font">
+                <i class="ph ph-coins text-yellow-400"></i>
+                <span id="ui-points" class="text-lg">0</span>
+            </div>
+        </div>
+    
+        <div class="flex flex-col items-center">
+            <span class="text-[9px] text-green-500 cyber-font uppercase opacity-70">Neural USDT</span>
+            <div class="flex items-center gap-1 font-bold cyber-font text-green-400">
+                <i class="ph ph-currency-dollar"></i>
+                <span id="ui-usdt" class="text-lg">0.00</span>
+            </div>
+        </div>
+
+        <div class="flex flex-col items-end">
+            <span class="text-[9px] text-pink-500 cyber-font uppercase opacity-70">Neural Energy</span>
+            <div class="flex items-center gap-1 font-bold cyber-font">
+                <span id="ui-energy" class="text-lg">0/10</span>
+                <i class="ph ph-lightning-fill text-pink-500"></i>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 pb-24 overflow-y-auto">
+        <section id="tab-profile" class="tab-content space-y-6">
+            <div class="glass-panel rounded-3xl p-6 neon-border relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 id="ui-username" class="text-xl font-bold cyber-font text-white truncate max-w-[150px]">---</h2>
+                        <span><button id="btn-ascender" onclick="openLevelModal()" class="hidden ml-2 bg-pink-600 text-white text-[9px] px-2 py-1 rounded-md cyber-font animate-pulse hover:bg-pink-500 transition-all">
+                            ASCENDER >>>
+                        </button></span>
+                        <span id="ui-level" class="inline-block bg-cyan-950 text-cyan-400 text-[9px] px-2 py-0.5 rounded border border-cyan-500/30 cyber-font mt-1 uppercase tracking-tighter">Level --</span>
+                    </div>
+                    <div class="p-2 bg-cyan-500/10 rounded-lg"><i class="ph ph-fingerprint text-2xl text-cyan-500"></i></div>
+                </div>
+
+                <div class="space-y-4 mt-6">
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] uppercase text-slate-500 tracking-wider"><span>Fuerza</span><span id="ui-str" class="text-cyan-400">0</span></div>
+                        <div class="stat-bar"><div id="bar-str" class="stat-progress" style="width: 0%"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] uppercase text-slate-500 tracking-wider"><span>Agilidad</span><span id="ui-agi" class="text-pink-400">0</span></div>
+                        <div class="stat-bar"><div id="bar-agi" class="stat-progress" style="width: 0%; background: var(--neon-pink);"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] uppercase text-slate-500 tracking-wider"><span>Neuro-Link</span><span id="ui-int" class="text-purple-400">0</span></div>
+                        <div class="stat-bar"><div id="bar-int" class="stat-progress" style="width: 0%; background: #a855f7;"></div></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/5">
+                    <div class="text-center">
+                        <span class="block text-[9px] text-slate-500 cyber-font uppercase tracking-tighter">Vitalidad</span>
+                        <span id="ui-hp" class="text-lg font-bold text-green-400 cyber-font">0</span>
+                    </div>
+                    <div class="text-center">
+                        <span class="block text-[9px] text-slate-500 cyber-font uppercase tracking-tighter">Potencia</span>
+                        <span id="ui-dmg" class="text-lg font-bold text-red-500 cyber-font">0</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-arena" class="tab-content hidden space-y-4">
+            <h3 class="cyber-font text-[10px] text-cyan-400 px-2 tracking-widest uppercase opacity-70">Red de Duelos Detectada</h3>
+            <div id="arena-list" class="space-y-3"></div>
+        </section>
+
+        <section id="tab-tasks" class="tab-content hidden p-4 space-y-6 pb-24">
+            <div class="text-center space-y-2">
+                <h2 class="cyber-font text-2xl font-bold text-cyan-400 tracking-tighter uppercase">Protocolos de Recompensa</h2>
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest">Cumple los requisitos para extraer BP del sistema</p>
+            </div>
+            <div id="tasks-container" class="space-y-4">
+            </div>
+        </section>
+
+        <section id="tab-wheel" class="tab-content hidden flex flex-col items-center py-10 space-y-8">
+            <div class="relative">
+                <div class="absolute -top-4 left-1/2 -translate-x-1/2 z-10 text-pink-500 drop-shadow-[0_0_5px_rgba(255,0,255,0.8)]">
+                    <i class="ph ph-caret-down-fill text-4xl"></i>
+                </div>
+        
+                <div id="wheel-disc" class="w-72 h-72 rounded-full border-8 border-slate-900 shadow-[0_0_30px_rgba(0,242,255,0.2)] relative overflow-hidden transition-transform duration-[4s] cubic-bezier(0.15, 0, 0.15, 1)">
+                    <canvas id="wheel-canvas" width="288" height="288"></canvas>
+                </div>
+
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-slate-950 rounded-full border-4 border-cyan-500 flex items-center justify-center shadow-2xl z-20">
+                    <div class="w-2 h-2 bg-cyan-400 rounded-full animate-ping"></div>
+                </div>
+            </div>
+
+            <div class="max-w-md mx-auto w-full p-4 glass-panel border border-cyan-500/30 rounded-xl relative overflow-hidden bg-[#0a0f18]">
+    
+              <div class="text-center mb-4">
+                  <h3 class="text-cyan-400 font-bold uppercase tracking-widest text-sm cyber-font">
+                      Terminal de Suministros
+                  </h3>
+                  <p class="text-xs text-slate-400">Decodificando paquetes de datos...</p>
+              </div>
+
+              <div class="relative w-full h-28 bg-black/50 border-y border-cyan-500/50 overflow-hidden shadow-[0_0_15px_rgba(0,255,255,0.1)_inset]">
+        
+                  <div class="absolute left-1/2 top-0 bottom-0 w-1 bg-fuchsia-500 transform -translate-x-1/2 z-20 shadow-[0_0_10px_#d946ef]"></div>
+        
+                  <div id="gacha-track" class="absolute left-0 top-0 h-full flex items-center transition-transform will-change-transform">
+                      </div>
+        
+                  <div class="absolute inset-0 pointer-events-none shadow-[inset_30px_0_30px_rgba(10,15,24,1),inset_-30px_0_30px_rgba(10,15,24,1)] z-10"></div>
+              </div>
+
+              <div class="mt-4 text-center">
+                  <button id="btn-spin" onclick="startGachaExtraction()" class="px-6 py-2 bg-cyan-600/20 border border-cyan-500 text-cyan-400 rounded text-xs uppercase font-bold hover:bg-cyan-500 hover:text-black transition-all shadow-[0_0_10px_rgba(0,255,255,0.3)]">
+                      Iniciar Extracción (-50 BP)
+                  </button>
+              </div>
+            </div>
+        </section>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 glass-panel border-t border-cyan-900/30 px-6 py-3 flex justify-between items-center z-40">
+        <button onclick="changeTab('profile')" id="nav-profile" class="tab-active flex flex-col items-center gap-1 flex-1">
+            <i class="ph ph-user-focus text-2xl"></i>
+            <span class="text-[8px] cyber-font uppercase">Perfil</span>
+        </button>
+        <button onclick="changeTab('arena')" id="nav-arena" class="text-slate-600 flex flex-col items-center gap-1 flex-1">
+            <i class="ph ph-sword text-2xl"></i>
+            <span class="text-[8px] cyber-font uppercase">Arena</span>
+        </button>
+        <button onclick="changeTab('tasks')" id="nav-tasks" class="text-slate-600 flex flex-col items-center gap-1 flex-1">
+            <i class="ph ph-calendar-check text-2xl"></i>
+            <span class="text-[8px] cyber-font uppercase">Tareas</span>
+        </button>
+        <button onclick="changeTab('wheel')" id="nav-wheel" class="text-slate-600 flex flex-col items-center gap-1 flex-1">
+            <i class="ph ph-clover text-2xl"></i>
+            <span class="text-[8px] cyber-font uppercase">Suerte</span>
+        </button>
+    </nav>
+
+    <div id="level-modal" class="fixed inset-0 z-[80] hidden bg-slate-950/95 flex items-center justify-center p-6 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-xs rounded-3xl p-6 border-pink-500/50 text-center space-y-5">
+            <div class="w-16 h-16 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center border border-pink-500/30">
+                <i class="ph ph-arrow-fat-up-bold text-3xl text-pink-500"></i>
+            </div>
+            <div>
+                <h3 class="cyber-font text-lg font-bold text-white uppercase tracking-tighter">Protocolo de Ascensión</h3>
+                <p id="level-warning" class="text-[11px] text-slate-400 mt-2 italic leading-relaxed"></p>
+            </div>
+            <div class="bg-slate-900/50 p-3 rounded-xl border border-white/5">
+                <p class="text-[9px] text-slate-500 uppercase cyber-font">Costo de Operación</p>
+                <p id="level-cost-display" class="text-xl font-bold text-pink-400 cyber-font"></p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeLevelModal()" class="flex-1 py-3 bg-slate-800 text-slate-400 rounded-xl cyber-font text-[10px] uppercase font-bold">Abortar</button>
+                <button id="confirm-level-btn" onclick="confirmLevelUp()" class="flex-1 py-3 bg-pink-600 text-white rounded-xl cyber-font text-[10px] uppercase font-bold shadow-[0_0_15px_rgba(219,39,119,0.4)]">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="gameover-modal" class="fixed inset-0 z-[100] hidden bg-red-950/95 flex items-center justify-center p-6 backdrop-blur-xl">
+        <div class="glass-panel w-full max-w-xs rounded-3xl p-8 border-red-500/50 text-center space-y-6 shadow-[0_0_50px_rgba(239,68,68,0.3)]">
+            <div class="relative">
+                <i class="ph ph-skull text-6xl text-red-600 animate-bounce"></i>
+                    <div class="absolute inset-0 bg-red-500 blur-2xl opacity-20"></div>
+                </div>
+        
+                <div>
+                    <h3 class="cyber-font text-2xl font-bold text-red-500 uppercase tracking-tighter">CONEXIÓN PERDIDA</h3>
+                    <p class="text-[12px] text-slate-400 mt-2 italic leading-relaxed">Tu enlace neural ha colapsado. Tus créditos han llegado a cero y el sistema ha purgado tu perfil.</p>
+                </div>
+
+                <div class="bg-red-950/40 p-4 rounded-xl border border-red-500/20">
+                    <p class="text-[10px] text-red-400 uppercase cyber-font font-bold">Estado: GAME OVER</p>
+                    <p class="text-[9px] text-slate-500 uppercase cyber-font">Progreso Reiniciado al Nivel 1</p>
+                </div>
+
+                <button onclick="rebootSystem()" class="w-full py-4 bg-red-600 text-white rounded-xl cyber-font text-xs font-bold tracking-[0.2em] uppercase shadow-[0_0_20px_rgba(220,38,38,0.5)] active:scale-95 transition-transform">
+                    REINICIAR SISTEMA
+                </button>
+            </div>
+        </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection, query, limit, getDocs, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Globales del entorno o configuración manual (Soporte para GitHub Pages)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAb6Y2Qoo7e3ceVb-yf8zIuj_grrhll7rM",
+            authDomain: "telegramtest-4279a.firebaseapp.com",
+            projectId: "telegramtest-4279a",
+            storageBucket: "telegramtest-4279a.firebasestorage.app",
+            messagingSenderId: "1006625167364",
+            appId: "1:1006625167364:web:f28361096019df39b37d51"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'burst-clicker-game';
+        
+        let localUser = null;
+        let isProcessingBattle = false;
+
+        const showMessage = (msg) => {
+            document.getElementById('info-message').innerText = msg;
+            document.getElementById('info-modal').classList.remove('hidden');
+        };
+        window.closeInfoModal = () => document.getElementById('info-modal').classList.add('hidden');
+
+        window.changeTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(el => {
+                el.classList.remove('tab-active');
+                el.classList.add('text-slate-600');
+            });
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const navBtn = document.getElementById(`nav-${tabId}`);
+            if(navBtn) {
+                navBtn.classList.add('tab-active');
+                navBtn.classList.remove('text-slate-600');
+            }
+            if (tabId === 'arena') loadArena();
+        };
+
+        async function loadArena() {
+            const listEl = document.getElementById('arena-list');
+            listEl.innerHTML = '<div class="py-10 text-center text-[10px] text-cyan-700 cyber-font animate-pulse uppercase tracking-widest">Escaneando sector...</div>';
+            
+            try {
+                // REGLA 1: /artifacts/{appId}/public/data/{collection}
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'arena_list'), limit(15));
+                const snap = await getDocs(q);
+                listEl.innerHTML = '';
+                
+                if(snap.empty) {
+                    listEl.innerHTML = '<p class="text-center text-slate-600 text-xs py-10">Sector sin actividad. Sé el primero.</p>';
+                    return;
+                }
+
+                snap.forEach(docSnap => {
+                    const rival = docSnap.data();
+                    if(rival.uid === auth.currentUser?.uid) return;
+
+                    const div = document.createElement('div');
+                    div.className = 'rival-card p-4 rounded-2xl flex justify-between items-center border border-white/5';
+                    div.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-slate-900 border border-cyan-500/20 flex items-center justify-center text-cyan-500">
+                                <i class="ph ph-shield-chevron"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold cyber-font uppercase text-white">${rival.username}</div>
+                                <div class="text-[9px] text-cyan-600 cyber-font uppercase tracking-tighter">LV.${rival.level} • BURST READY</div>
+                            </div>
+                        </div>
+                        <button id="btn-${rival.uid}" onclick="startDuel('${rival.uid}')" class="bg-cyan-600 text-white text-[9px] font-bold px-4 py-2 rounded-lg cyber-font uppercase tracking-widest hover:bg-cyan-500 transition-colors">Retar</button>
+                    `;
+                    listEl.appendChild(div);
+                });
+            } catch (e) { console.error("Error cargando Arena:", e); }
+        }
+
+        window.startDuel = async (rivalUid) => {
+            if (isProcessingBattle || !localUser) return;
+            if (localUser.energy <= 0) {
+                showMessage("Energía crítica. Espera a la recarga neural.");
+                return;
+            }
+
+            const btn = document.getElementById(`btn-${rivalUid}`);
+            const originalText = btn?.innerText || "Retar";
+            
+            isProcessingBattle = true;
+            if(btn) {
+                btn.innerText = "LINKING...";
+                btn.classList.add('btn-loading');
+            }
+
+            try {
+                // Obtener datos del rival desde ruta pública (REGLA 1)
+                const rivalRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', rivalUid);
+                const rivalSnap = await getDoc(rivalRef);
+                
+                if (!rivalSnap.exists()) { throw new Error("Rival no encontrado en el servidor."); }
+                const rival = rivalSnap.data();
+
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                const myPower = (localUser.stats.str * 1.5) + (localUser.stats.agi * 1.2) + (localUser.level * 5);
+                const rivalPower = (rival.stats.str * 1.5) + (rival.stats.agi * 1.2) + (rival.level * 5);
+                const myLuck = 0.8 + (Math.random() * 0.7);
+                const rivalLuck = 0.8 + (Math.random() * 0.7);
+
+                const win = (myPower * myLuck) > (rivalPower * rivalLuck);
+                let pointsChange = win ? 10 : -10;
+                
+                // Bono por diferencia de nivel (si ganas a alguien más fuerte)
+                if (win && rival.level > localUser.level) {
+                    pointsChange += (rival.level - localUser.level) * 15;
+                }
+                
+                const finalPoints = Math.max(0, localUser.points + pointsChange);
+
+                // Guardar resultado (REGLA 1)
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', auth.currentUser.uid);
+                await updateDoc(userRef, {
+                    energy: increment(-1),
+                    points: finalPoints
+                });
+
+                // UI Modal
+                const modalIcon = document.getElementById('battle-icon');
+                const rewardBox = document.getElementById('battle-reward');
+                
+                document.getElementById('battle-modal').classList.remove('hidden');
+                document.getElementById('battle-title').innerText = win ? "Victoria" : "Derrota";
+                document.getElementById('battle-title').className = `cyber-font text-2xl font-bold ${win ? 'text-green-400' : 'text-red-500'}`;
+                
+                modalIcon.className = win ? "ph ph-trophy text-4xl text-green-400" : "ph ph-skull text-4xl text-red-500";
+                rewardBox.innerText = win ? `+${pointsChange} Burst Points` : `${pointsChange} Burst Points`;
+                rewardBox.className = `py-2 px-4 rounded-lg cyber-font text-sm ${win ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`;
+                
+                document.getElementById('battle-log').innerText = win 
+                    ? `Sincronización perfecta. Has extraído datos valiosos de ${rival.username}.`
+                    : `Sobrecarga del sistema. ${rival.username} ha interceptado tus créditos.`;
+
+            } catch (e) { 
+                showMessage("Fallo de combate: " + e.message);
+            } finally {
+                isProcessingBattle = false;
+                if(btn) {
+                    btn.innerText = originalText;
+                    btn.classList.remove('btn-loading');
+                }
+            }
+        };
+
+        window.closeBattleModal = () => document.getElementById('battle-modal').classList.add('hidden');
+
+        // --- SISTEMA DE ASCENSIÓN ---
+
+        // Calcula el costo: Nivel 2 = 200, luego se duplica cada vez
+        const getLevelCost = (nextLevel) => {
+            if (nextLevel <= 1) return 0;
+            return 200 * Math.pow(2, nextLevel - 2);
+        };
+
+        // Abre el modal y configura los textos
+        window.openLevelModal = () => {
+            if (!localUser || localUser.level >= 9) return;
+    
+            const nextLevel = localUser.level + 1;
+            const cost = getLevelCost(nextLevel);
+    
+            document.getElementById('level-warning').innerText = `Estás a punto de subir al NIVEL ${nextLevel}. Se descontarán los puntos de tu balance. Cuidado: un balance bajo te hace vulnerable en la arena.`;
+            document.getElementById('level-cost-display').innerText = `${cost} BP`;
+            document.getElementById('level-modal').classList.remove('hidden');
+        };
+
+        window.closeLevelModal = () => {
+            document.getElementById('level-modal').classList.add('hidden');
+        };
+
+        // Procesa la subida de nivel en Firebase
+        window.confirmLevelUp = async () => {
+            const btn = document.getElementById('confirm-level-btn');
+            const nextLevel = localUser.level + 1;
+            const cost = getLevelCost(nextLevel);
+
+            if (localUser.points < cost) {
+                showMessage("Puntos insuficientes para la ascensión.");
+                closeLevelModal();
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = "PROCESANDO...";
+
+            try {
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', auth.currentUser.uid);
+                const arenaRef = doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', auth.currentUser.uid);
+
+                // Actualizamos nivel y restamos puntos
+                await updateDoc(userRef, {
+                    level: increment(1),
+                    "stats.str": increment(nextLevel),
+                    "stats.agi": increment(nextLevel),
+                    "stats.int": increment(nextLevel),
+                    points: increment(-cost)
+                });
+
+                // Actualizamos también su nivel en la lista pública de la arena
+                await updateDoc(arenaRef, {
+                    level: nextLevel
+                });
+
+                closeLevelModal();
+                showMessage(`¡ASCENSIÓN COMPLETADA! Ahora eres Nivel ${nextLevel}`);
+            } catch (e) {
+                console.error("Error en ascensión:", e);
+                showMessage("Error en el enlace neural.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Confirmar";
+            }
+        };
+
+        // Función para verificar si debe aparecer el botón (Llamar esto dentro del onSnapshot de los puntos)
+        const checkLevelUpAvailability = () => {
+            const btn = document.getElementById('btn-ascender');
+            if (!localUser || localUser.level >= 9) {
+                btn.classList.add('hidden');
+                return;
+            }
+
+            const nextLevel = localUser.level + 1;
+            const cost = getLevelCost(nextLevel);
+
+            if (localUser.points >= cost) {
+                btn.classList.remove('hidden');
+            } else {
+                btn.classList.add('hidden');
+            }
+        };
+        
+        
+        async function initGame(user) {
+            try {
+                // REGLA 1: /artifacts/{appId}/public/data/players/{uid}
+                const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+                const pSnap = await getDoc(pRef);
+
+                if (!pSnap.exists()) {
+                    const stats = {
+                        str: Math.floor(Math.random() * 8) + 5,
+                        agi: Math.floor(Math.random() * 8) + 5,
+                        int: Math.floor(Math.random() * 8) + 5
+                    };
+                    const name = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || "Runner_" + user.uid.slice(0,4);
+                    const data = { uid: user.uid, username: name, points: 100, usdt: 0.00, level: 1, energy: 10, stats, createdAt: serverTimestamp() };
+                    
+                    await setDoc(pRef, data);
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', user.uid), { 
+                        username: name, level: 1, uid: user.uid 
+                    });
+                }
+
+                onSnapshot(pRef, (snap) => {
+                    if (snap.exists()) {
+                        localUser = snap.data();
+                        document.getElementById('ui-points').innerText = Math.floor(localUser.points);
+                        document.getElementById('ui-energy').innerText = `${localUser.energy}/10`;
+                        document.getElementById('ui-username').innerText = localUser.username;
+                        document.getElementById('ui-level').innerText = `LEVEL ${localUser.level}`;
+                        document.getElementById('ui-str').innerText = localUser.stats.str;
+                        document.getElementById('ui-agi').innerText = localUser.stats.agi;
+                        document.getElementById('ui-int').innerText = localUser.stats.int;
+                        document.getElementById('bar-str').style.width = `${(localUser.stats.str / 40) * 100}%`;
+                        document.getElementById('bar-agi').style.width = `${(localUser.stats.agi / 40) * 100}%`;
+                        document.getElementById('bar-int').style.width = `${(localUser.stats.int / 40) * 100}%`;
+                        document.getElementById('ui-hp').innerText = localUser.stats.str * 10 + (localUser.level * 20);
+                        document.getElementById('ui-dmg').innerText = localUser.stats.str * 2 + (localUser.level * 5);
+                        document.getElementById('loader').classList.add('hidden');
+                        document.getElementById('ui-usdt').innerText = (localUser.usdt || 0).toFixed(2);
+
+                        renderTasks();
+                        
+                        // Y llama a drawWheel por si el canvas no se ha pintado
+                        drawWheel();
+
+                        checkDailyEnergy();
+
+                        // Dentro del onSnapshot, al final:
+                        checkLevelUpAvailability();
+
+                        checkGameOver();
+
+                        
+                    }
+                }, (err) => console.error("Error en tiempo real:", err));
+                setInterval(checkDailyEnergy, 60000);
+            } catch (e) { 
+                document.getElementById('error-display').innerText = "Error de Red Burst: " + e.message;
+                document.getElementById('error-display').classList.remove('hidden');
+            }
+        }
+
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Fallo de Autenticación:", error);
+            }
+        };
+
+        initAuth();
+        onAuthStateChanged(auth, (user) => {
+            if (user) initGame(user);
+        });
+
+        if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
+
+        // --- SISTEMA DE RECARGA DIARIA (00:00 UTC) ---
+        window.checkDailyEnergy = async () => {
+            // Si no hay usuario cargado, no hacemos nada
+            if (!localUser || !auth.currentUser) return;
+
+            // 1. Obtenemos la fecha actual exacta en UTC (Formato: YYYY-MM-DD)
+            const now = new Date();
+            const todayUTC = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+
+            // 2. Comprobamos si es un día nuevo en el servidor
+            if (localUser.lastEnergyReset !== todayUTC) {
+                try {
+                    const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', auth.currentUser.uid);
+            
+                    // Actualizamos la energía a 10 y guardamos el día de hoy para no volver a dársela
+                    await updateDoc(userRef, {
+                        energy: 10,
+                        lastEnergyReset: todayUTC
+                    });
+            
+                    console.log("Sistema: Energía diaria restaurada (00:00 UTC).");
+            
+                    // Opcional: Mostramos una alerta estética si el usuario estaba jugando en ese momento
+                    if (localUser.lastEnergyReset !== undefined) {
+                        showMessage("¡Un nuevo ciclo ha comenzado! Tu Energía Neural ha sido restaurada al máximo.");
+                    }
+                } catch (e) {
+                    console.error("Fallo al restaurar energía diaria:", e);
+                }
+            }
+        };
+
+        // --- SISTEMA DE GAME OVER ---
+
+        window.checkGameOver = async () => {
+            // Solo actuamos si el usuario tiene 0 o menos puntos y aún no estamos en nivel 1
+            if (localUser && localUser.points <= 0) {
+                document.getElementById('gameover-modal').classList.remove('hidden');
+            }
+        };
+
+        window.rebootSystem = async () => {
+            const btn = document.querySelector('#gameover-modal button');
+            btn.disabled = true;
+            btn.innerText = "BORRANDO DATOS...";
+
+            try {
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', auth.currentUser.uid);
+                const arenaRef = doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', auth.currentUser.uid);
+
+                // Reinicio total de estadísticas y nivel
+                const resetData = {
+                    level: 1,
+                    points: 100, // Le damos 100 puntos iniciales para que pueda volver a empezar
+                    energy: 10,
+                    stats: {
+                        str: Math.floor(Math.random() * 5) + 5,
+                        agi: Math.floor(Math.random() * 5) + 5,
+                        int: Math.floor(Math.random() * 5) + 5
+                    }
+                };
+
+                await updateDoc(userRef, resetData);
+                await updateDoc(arenaRef, { level: 1 });
+
+                document.getElementById('gameover-modal').classList.add('hidden');
+                showMessage("Sistema reiniciado. Runner de Nivel 1 detectado.");
+        
+            } catch (e) {
+                console.error("Fallo en el reinicio:", e);
+                alert("Error crítico al intentar reiniciar el sistema.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "REINICIAR SISTEMA";
+            }
+        };
+
+        // --- MÓDULO DE LA RULETA NEURAL ---
+
+        // Nuestro catálogo (Infografía y recompensas reales)
+const prizesPool = [
+    { id: 'bp_10', name: '10 BP', icon: '💠', type: 'points', amount: 10, rarity: 'rarity-common' },
+    { id: 'bp_50', name: '50 BP', icon: '💠', type: 'points', amount: 50, rarity: 'rarity-rare' },
+    { id: 'energy_5', name: '5 Batería', icon: '⚡', type: 'energy', amount: 5, rarity: 'rarity-epic' },
+    { id: 'usdt_1', name: '1 USDT', icon: '💰', type: 'usdt', amount: 1, rarity: 'rarity-legendary' },
+    { id: 'bp_100', name: '100 BP', icon: '💠', type: 'points', amount: 100, rarity: 'rarity-epic' }
+];
+
+let isSpinning = false;
+
+window.startGachaExtraction = async () => {
+    if (isSpinning) return;
+    
+    // 1. Aquí harías la validación con Firebase:
+    // if (localUser.points < 50) return alert("BP Insuficientes");
+    // await updateDoc(userRef, { points: increment(-50) });
+
+    isSpinning = true;
+    const track = document.getElementById('gacha-track');
+    const btn = document.getElementById('btn-spin');
+    
+    btn.innerText = "EXTRAYENDO...";
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    track.style.transition = 'none'; // Reseteamos la animación anterior
+    track.style.transform = 'translateX(0px)';
+
+    // 2. Determinar el premio ganador (Aquí podrías conectar tus probabilidades de Firebase)
+    // Para el ejemplo, elegimos uno al azar del pool:
+    const winnerIndexLogic = Math.floor(Math.random() * prizesPool.length);
+    const winnerItem = prizesPool[winnerIndexLogic];
+
+    // 3. Construir la "Cinta" visual
+    // Creamos 40 items de relleno, y el item 41 es nuestro ganador.
+    const WINNING_SLOT = 40; 
+    const TOTAL_ITEMS = 45; // Unos cuantos más para que no se acabe la cinta de golpe
+    
+    let trackHTML = '';
+    for (let i = 0; i < TOTAL_ITEMS; i++) {
+        // Asignamos un item aleatorio al relleno, o el ganador en la posición clave
+        const item = (i === WINNING_SLOT) ? winnerItem : prizesPool[Math.floor(Math.random() * prizesPool.length)];
+        
+        trackHTML += `
+            <div class="gacha-item ${item.rarity}" id="slot-${i}">
+                <div class="text-2xl mb-1">${item.icon}</div>
+                <div class="text-[10px] font-bold uppercase tracking-wider">${item.name}</div>
+            </div>
+        `;
+    }
+    track.innerHTML = trackHTML;
+
+    // 4. Matemáticas de la inercia (Forzamos un reflow para que CSS aplique el reset)
+    void track.offsetWidth; 
+
+    // Calculamos el ancho de cada tarjeta + sus márgenes (90px ancho + 4px margin L + 4px margin R = 98px)
+    const itemWidth = 98; 
+    const containerWidth = track.parentElement.clientWidth;
+    
+    // Posición para que el WINNING_SLOT quede en el centro de la pantalla
+    // Desplazamiento = (Mitad del contenedor) - (Posición de inicio de la tarjeta) - (Mitad de la tarjeta)
+    const targetX = (containerWidth / 2) - (WINNING_SLOT * itemWidth) - (itemWidth / 2);
+    
+    // Añadimos una pequeña variación aleatoria (-20px a +20px) para que no siempre caiga en el centro milimétrico perfecto
+    const randomOffset = Math.floor(Math.random() * 40) - 20;
+    const finalTransform = targetX + randomOffset;
+
+    // 5. ¡A girar!
+    track.classList.add('gacha-spin-animation');
+    track.style.transform = `translateX(${finalTransform}px)`;
+
+    // 6. Finalizar y entregar el premio
+    setTimeout(async () => {
+        // Iluminar el ganador
+        document.getElementById(`slot-${WINNING_SLOT}`).classList.add('winner-highlight');
+        
+        btn.innerText = `¡GANASTE ${winnerItem.name}!`;
+        btn.classList.replace('border-cyan-500', 'border-fuchsia-500');
+        btn.classList.replace('text-cyan-400', 'text-fuchsia-400');
+        
+        // Aquí interactúas de nuevo con Firebase para sumar el premio
+        // await updateDoc(userRef, { [winnerItem.type]: increment(winnerItem.amount) });
+        
+        setTimeout(() => {
+            isSpinning = false;
+            btn.innerText = "INICIAR EXTRACCIÓN (-50 BP)";
+            btn.classList.replace('border-fuchsia-500', 'border-cyan-500');
+            btn.classList.replace('text-fuchsia-400', 'text-cyan-400');
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }, 3000); // El mensaje de victoria dura 3 segundos
+        
+    }, 6000); // 6000ms debe coincidir con los 6s de la transición CSS
+};
+
+        // --- SISTEMA DE MISIONES Y LOGROS ---
+
+const TASK_LIST = [
+    { id: 'daily_checkin', title: 'Check-in Diario', desc: 'Sincroniza tu enlace neural cada 24h.', reward: 10, type: 'daily' },
+  //  { id: 'daily_wins', title: 'Dominio de Arena', desc: 'Gana 7 batallas hoy (Progreso: {n}/7).', reward: 30, type: 'daily', goal: 7 },
+    { id: 'task_telegram', title: 'Unirse al Canal', desc: 'Únete a nuestro canal oficial de Telegram.', reward: 50, type: 'once', link: 'https://t.me/ea_cryptosphere' },
+    { id: 'ref_1', title: 'Reclutador Novato', desc: 'Alcanza 1 referido.', reward: 10, type: 'once', goal: 1 },
+    { id: 'ref_5', title: 'Líder de Escuadrón', desc: 'Alcanza 5 referidos.', reward: 50, type: 'once', goal: 5 },
+    { id: 'ref_10', title: 'Comandante de Red', desc: 'Alcanza 10 referidos.', reward: 200, type: 'once', goal: 10 }
+];
+
+window.renderTasks = () => {
+    const container = document.getElementById('tasks-container');
+    if (!container || !localUser) return;
+
+    // Obtenemos el estado de misiones del usuario (o inicializamos si no existe)
+    const status = localUser.taskStatus || {};
+    const today = new Date().toISOString().split('T')[0];
+
+    // Ordenar: No cumplidas arriba, cumplidas abajo
+    const sortedTasks = [...TASK_LIST].sort((a, b) => {
+        const aDone = isTaskDone(a.id, status, today);
+        const bDone = isTaskDone(b.id, status, today);
+        return aDone - bDone;
+    });
+
+    container.innerHTML = sortedTasks.map(task => {
+        const done = isTaskDone(task.id, status, today);
+        let progressText = task.desc;
+        
+        // Lógica de texto dinámico para progreso
+        if (task.id === 'daily_wins') progressText = task.desc.replace('{n}', localUser.dailyWins || 0);
+
+        return `
+            <div class="glass-panel p-4 rounded-2xl border ${done ? 'border-slate-800 opacity-60' : 'border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.05)]'} transition-all">
+                <div class="flex justify-between items-center">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] py-0.5 px-2 rounded-md ${task.type === 'daily' ? 'bg-orange-500/10 text-orange-400' : 'bg-purple-500/10 text-purple-400'} border border-current/20 font-bold uppercase">${task.type === 'daily' ? 'Diaria' : 'Única'}</span>
+                            <h4 class="cyber-font text-sm font-bold text-white">${task.title}</h4>
+                        </div>
+                        <p class="text-[11px] text-slate-400 italic">${progressText}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs font-bold text-cyan-400 cyber-font">+${task.reward} BP</p>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    ${done ? 
+                        `<button disabled class="w-full py-2 bg-slate-800 text-slate-500 rounded-xl text-[10px] font-bold uppercase cyber-font">COMPLETADA</button>` :
+                        `<button onclick="verifyTask('${task.id}')" class="w-full py-2 bg-cyan-600/20 hover:bg-cyan-600 text-cyan-400 hover:text-white border border-cyan-500/30 rounded-xl text-[10px] font-bold uppercase cyber-font transition-all">Verificar y Reclamar</button>`
+                    }
+                </div>
+            </div>
+        `;
+    }).join('');
+};
+
+function isTaskDone(id, status, today) {
+    if (!status[id]) return false;
+    if (status[id].lastDone === today) return true; // Para diarias
+    if (status[id].completed) return true; // Para únicas
+    return false;
+}
+
+window.verifyTask = async (taskId) => {
+    if (!localUser) return;
+    const task = TASK_LIST.find(t => t.id === taskId);
+    const today = new Date().toISOString().split('T')[0];
+    let canClaim = false;
+
+    // --- LÓGICA DE VERIFICACIÓN FUERTE ---
+    switch(taskId) {
+        case 'daily_checkin':
+            canClaim = true; // El check-in siempre es válido si no se ha hecho hoy
+            break;
+        case 'daily_wins':
+            if ((localUser.dailyWins || 0) >= 7) canClaim = true;
+            break;
+        case 'task_telegram':
+            // VERIFICACIÓN TELEGRAM:
+            // Para que sea "fuerte", un BOT de Telegram debe actualizar el campo 'telegramJoined' 
+            // en el documento del usuario en Firebase cuando el usuario se una al canal.
+            if (localUser.telegramJoined === true) {
+                canClaim = true;
+            } else {
+                // Si no está verificado, abrimos el link primero
+                window.open(task.link, '_blank');
+                showTaskModal("VERIFICACIÓN PENDIENTE", "Debes unirte al canal y esperar a que el sistema valide tu ID de Telegram. Si ya lo hiciste, intenta de nuevo en unos segundos.");
+                return;
+            }
+            break;
+        case 'ref_1': case 'ref_5': case 'ref_10':
+            if ((localUser.referralCount || 0) >= task.goal) canClaim = true;
+            break;
+    }
+
+    if (canClaim) {
+        try {
+            const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', auth.currentUser.uid);
+            
+            // Estructura de actualización
+            const updateObj = {
+                points: increment(task.reward),
+                [`taskStatus.${taskId}.lastDone`]: today,
+                [`taskStatus.${taskId}.completed`]: true
+            };
+
+            await updateDoc(userRef, updateObj);
+            
+            showTaskModal("MISION CUMPLIDA", `Has extraído exitosamente ${task.reward} BP del sistema. Tu balance ha sido actualizado.`);
+            renderTasks();
+        } catch (e) {
+            console.error("Error al reclamar:", e);
+        }
+    } else {
+        showTaskModal("REQUISITOS NO CUMPLIDOS", "El sistema no ha podido verificar los requisitos de esta misión. Asegúrate de cumplir el objetivo antes de reclamar.");
+    }
+};
+
+// Modal informativo reutilizable
+function showTaskModal(title, msg) {
+    // Reutilizamos la estructura del modal de batalla para coherencia
+    document.getElementById('battle-title').innerText = title;
+    document.getElementById('battle-log').innerText = msg;
+    document.getElementById('battle-reward').innerText = "OK";
+    document.getElementById('battle-modal').classList.remove('hidden');
+}
+        
+    </script>
+</body>
+</html>
