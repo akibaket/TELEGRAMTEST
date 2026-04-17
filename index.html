@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Burst Clicker | Cyberpunk Arena</title>
+    <title>Cyberpunk Arena</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -429,9 +429,9 @@
                 // Actualizamos nivel y restamos puntos
                 await updateDoc(userRef, {
                     level: increment(1),
-                    "stats.str": increment(level),
-                    "stats.agi": increment(level),
-                    "stats.int": increment(level)
+                    "stats.str": increment(nextLevel),
+                    "stats.agi": increment(nextLevel),
+                    "stats.int": increment(nextLevel)
                     points: increment(-cost)
                 });
 
