@@ -155,6 +155,22 @@
                     </div>
                 </div>
             </div>
+
+            <div class="max-w-md mx-auto w-full p-3 glass-panel border border-cyan-500/30 rounded-xl text-center mt-4 bg-[#0a0f18]">
+                <h4 class="text-[10px] text-cyan-400 font-bold uppercase tracking-widest mb-2 cyber-font">
+                    Enlace de Reclutamiento
+                </h4>
+    
+                <div onclick="copyReferralLink()" class="flex items-center justify-between bg-black/50 border border-cyan-500/50 rounded p-2 cursor-pointer hover:bg-cyan-900/20 transition-colors shadow-[inset_0_0_10px_rgba(0,255,255,0.1)]">
+                    <span id="ref-link-text" class="text-[10px] text-slate-300 truncate font-mono">Generando enlace...</span>
+                    <span class="text-cyan-400 text-sm ml-2">📋</span>
+                </div>
+    
+                <p class="text-[10px] text-slate-400 mt-2 uppercase">
+                    Reclutas Totales: <span id="ui-referrals" class="text-fuchsia-400 font-bold text-xs">0</span>
+                </p>
+            </div>
+            
         </section>
 
         <section id="tab-arena" class="tab-content hidden space-y-4">
@@ -172,20 +188,7 @@
         </section>
 
         <section id="tab-wheel" class="tab-content hidden flex flex-col items-center py-10 space-y-8">
-            <div class="relative">
-                <div class="absolute -top-4 left-1/2 -translate-x-1/2 z-10 text-pink-500 drop-shadow-[0_0_5px_rgba(255,0,255,0.8)]">
-                    <i class="ph ph-caret-down-fill text-4xl"></i>
-                </div>
-        
-                <div id="wheel-disc" class="w-72 h-72 rounded-full border-8 border-slate-900 shadow-[0_0_30px_rgba(0,242,255,0.2)] relative overflow-hidden transition-transform duration-[4s] cubic-bezier(0.15, 0, 0.15, 1)">
-                    <canvas id="wheel-canvas" width="288" height="288"></canvas>
-                </div>
-
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-slate-950 rounded-full border-4 border-cyan-500 flex items-center justify-center shadow-2xl z-20">
-                    <div class="w-2 h-2 bg-cyan-400 rounded-full animate-ping"></div>
-                </div>
-            </div>
-
+            
             <div class="max-w-md mx-auto w-full p-4 glass-panel border border-cyan-500/30 rounded-xl relative overflow-hidden bg-[#0a0f18]">
     
               <div class="text-center mb-4">
@@ -526,6 +529,8 @@
                 // REGLA 1: /artifacts/{appId}/public/data/players/{uid}
                 const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
                 const pSnap = await getDoc(pRef);
+                
+                const referrerId = tg.initDataUnsafe?.start_param;
 
                 if (!pSnap.exists()) {
                     const stats = {
@@ -538,8 +543,22 @@
                     
                     await setDoc(pRef, data);
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', user.uid), { 
-                        username: name, level: 1, uid: user.uid 
+                        username: name, level: 1, uid: user.uid, referralsCount: 0, referredBy: referrerId || null, 
                     });
+                }
+
+                // 3. RECOMPENSAR AL QUE LO INVITÓ (Si existe un referrerId y no es él mismo)
+                if (referrerId && referrerId !== user.uid) {
+                    try {
+                        const referrerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', referrerId);
+                        await updateDoc(referrerRef, {
+                                referralsCount: increment(1), // Le sumamos 1 al contador
+                                points: increment(10) // ¡Premio por invitar! (Ajusta esto a tu economía)
+                        });
+                        console.log("Recompensa enviada al reclutador:", referrerId);
+                    } catch (e) {
+                        console.error("Error al recompensar al reclutador:", e);
+                    }
                 }
 
                 onSnapshot(pRef, (snap) => {
@@ -559,6 +578,13 @@
                         document.getElementById('ui-dmg').innerText = localUser.stats.str * 2 + (localUser.level * 5);
                         document.getElementById('loader').classList.add('hidden');
                         document.getElementById('ui-usdt').innerText = (localUser.usdt || 0).toFixed(2);
+
+                        // Actualizar UI de Referidos
+                        const botUsernameUI = "@TestoTestTestoBot";
+                        const appNameUI = "TELEGRAMTEST";
+
+                        document.getElementById('ui-referrals').innerText = localUser.referralsCount || 0;
+                        document.getElementById('ref-link-text').innerText = `https://t.me/${botUsernameUI}/${appNameUI}?startapp=${localUser.id}`;
 
                         renderTasks();
                         
@@ -750,6 +776,35 @@ window.startGachaExtraction = async () => {
     }, 6000);
 };
 
+
+
+        // 1. FUNCIÓN PARA COPIAR EL ENLACE
+window.copyReferralLink = () => {
+    // IMPORTANTE: Cambia estos dos datos por los tuyos de BotFather
+    const botUsername = "TestoTestTestoBot"; // Ej: AkibaRunnerBot
+    const appName = "TELEGRAMTEST"; // Ej: akibaapp
+    
+    // Si no hay usuario cargado aún, evitamos el error
+    if (!auth.currentUser) return alert("Cargando datos...");
+
+    const link = `https://t.me/${botUsername}/${appName}?startapp=${auth.currentUser.uid}`;
+    
+    navigator.clipboard.writeText(link).then(() => {
+        // Un feedback visual rápido
+        const linkText = document.getElementById('ref-link-text');
+        const originalText = linkText.innerText;
+        linkText.innerText = "¡ENLACE COPIADO!";
+        linkText.classList.add('text-fuchsia-400');
+        
+        setTimeout(() => {
+            linkText.innerText = originalText;
+            linkText.classList.remove('text-fuchsia-400');
+        }, 2000);
+    }).catch(err => {
+        console.error("Error al copiar: ", err);
+    });
+};
+        
         // --- SISTEMA DE MISIONES Y LOGROS ---
 
 const TASK_LIST = [
