@@ -529,7 +529,8 @@
                 // REGLA 1: /artifacts/{appId}/public/data/players/{uid}
                 const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
                 const pSnap = await getDoc(pRef);
-                
+
+                const tg = window.Telegram.WebApp;
                 const referrerId = tg.initDataUnsafe?.start_param;
 
                 if (!pSnap.exists()) {
