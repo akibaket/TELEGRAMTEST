@@ -540,11 +540,12 @@
                         int: Math.floor(Math.random() * 8) + 5
                     };
                     const name = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || "Runner_" + user.uid.slice(0,4);
-                    const data = { uid: user.uid, username: name, points: 100, usdt: 0.00, level: 1, energy: 10, stats, createdAt: serverTimestamp() };
+                    const data = { uid: user.uid, username: name, points: 100, usdt: 0.00, level: 1, energy: 10, stats, createdAt: serverTimestamp(), referralsCount: 0, 
+                                  referredBy: referrerId || null, };
                     
                     await setDoc(pRef, data);
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', user.uid), { 
-                        username: name, level: 1, uid: user.uid, referralsCount: 0, referredBy: referrerId || null, 
+                        username: name, level: 1, uid: user.uid 
                     });
                 }
 
