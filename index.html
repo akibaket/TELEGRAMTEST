@@ -471,7 +471,7 @@
                                 <div class="text-[9px] text-cyan-600 cyber-font uppercase tracking-tighter">LV.${rival.level} • BURST READY</div>
                             </div>
                         </div>
-                        <button id="btn-${rival.uid}" onclick="iniciarBatallaTap('${p.id}', '${p.username}', ${p.level})" class="bg-cyan-600 text-white text-[9px] font-bold px-4 py-2 rounded-lg cyber-font uppercase tracking-widest hover:bg-cyan-500 transition-colors">Retar</button>
+                        <button id="btn-${rival.uid}" onclick="iniciarBatallaTap('${rival.id}', '${rival.username}', ${rival.level})" class="bg-cyan-600 text-white text-[9px] font-bold px-4 py-2 rounded-lg cyber-font uppercase tracking-widest hover:bg-cyan-500 transition-colors">Retar</button>
                     `;
                     listEl.appendChild(div);
                 });
