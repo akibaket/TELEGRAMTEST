@@ -471,7 +471,7 @@
                                 <div class="text-[9px] text-cyan-600 cyber-font uppercase tracking-tighter">LV.${rival.level} • BURST READY</div>
                             </div>
                         </div>
-                        <button id="btn-${rival.uid}" onclick="iniciarBatallaTap('${rival}')" class="bg-cyan-600 text-white text-[9px] font-bold px-4 py-2 rounded-lg cyber-font uppercase tracking-widest hover:bg-cyan-500 transition-colors">Retar</button>
+                        <button id="btn-${rival.uid}" onclick="iniciarBatallaTap('${p.id}', '${p.username}', ${p.level})" class="bg-cyan-600 text-white text-[9px] font-bold px-4 py-2 rounded-lg cyber-font uppercase tracking-widest hover:bg-cyan-500 transition-colors">Retar</button>
                     `;
                     listEl.appendChild(div);
                 });
@@ -1063,142 +1063,121 @@ function showTaskModal(title, msg) {
 
         let battleState = {
     active: false,
-    hpMax: 0,
-    hpCurrent: 0,
+    hpMax: 1000,
+    hpCurrent: 1000,
     timeLeft: 5.0,
     opponentData: null
 };
 
-window.iniciarBatallaTap = (opponent) => {
-    // Si pasas el objeto directamente desde el onclick, lo capturamos aquí
-    battleState.opponentData = opponent;
+window.iniciarBatallaTap = (id, name, level) => {
+    // 1. Forzar limpieza de estados previos
+    if (bState.interval) clearInterval(bState.interval);
     
     const modal = document.getElementById('battle-modal');
     const countdown = document.getElementById('battle-countdown');
-    const countdownText = document.getElementById('countdown-text');
-    const resultScreen = document.getElementById('battle-result');
+    const countEl = document.getElementById('countdown-text');
+    const result = document.getElementById('battle-result');
 
-    // 1. Inyectar datos (Aseguramos que no esté vacío)
-    document.getElementById('battle-opponent-name').innerText = opponent.username || 'ANÓNIMO';
-    document.getElementById('battle-opponent-level').innerText = `Nivel ${opponent.level || 1}`;
-    document.getElementById('battle-opponent-avatar').innerText = "👤"; // O usa el emoji que tengas en tu BD
+    // 2. Inyectar datos con validación
+    document.getElementById('battle-opponent-name').innerText = name || "DESCONOCIDO";
+    document.getElementById('battle-opponent-level').innerText = `NIVEL ${level || 1}`;
     
-    battleState.hpMax = (opponent.level || 1) * 100;
-    battleState.hpCurrent = battleState.hpMax;
-    battleState.timeLeft = 5.0;
-    battleState.active = false;
+    bState.hpMax = (level || 1) * 100;
+    bState.hpCur = bState.hpMax;
+    bState.time = 5.0;
+    bState.active = false;
 
-    // Reset UI
+    // 3. Reset Visual UI
+    modal.style.display = 'flex'; // Usamos style directo para evitar conflictos de clases
+    modal.classList.remove('hidden');
+    countdown.style.display = 'flex';
+    countdown.classList.remove('hidden');
+    result.classList.add('hidden');
     updateHealthUI();
-    document.getElementById('battle-timer-bar').style.width = '100%';
-    document.getElementById('battle-time-text').innerText = "05.0s";
-    modal.classList.replace('hidden', 'flex');
-    countdown.classList.replace('hidden', 'flex');
-    resultScreen.classList.add('hidden');
 
-    // 2. Cuenta atrás mejorada
+    // 4. Cuenta Atrás con Logs para Debug
     let count = 3;
-    const interval = setInterval(() => {
+    countEl.innerText = count;
+    console.log("Iniciando combate contra:", name);
+
+    const countInt = setInterval(() => {
         count--;
         if (count > 0) {
-            countdownText.innerText = count;
+            countEl.innerText = count;
         } else if (count === 0) {
-            countdownText.innerText = "GO!";
-            countdownText.className = "text-8xl font-black italic text-fuchsia-500 animate-ping";
+            countEl.innerText = "¡GO!";
+            countEl.style.color = "#f5f"; // Fucsia ciberpunk
         } else {
-            clearInterval(interval);
-            countdown.classList.add('hidden');
-            battleState.active = true;
-            runBattleTimer();
+            clearInterval(countInt);
+            countdown.style.display = 'none';
+            bState.active = true;
+            startLoop();
         }
     }, 1000);
 };
 
-function runBattleTimer() {
+function startLoop() {
     const timerBar = document.getElementById('battle-timer-bar');
-    const timerText = document.getElementById('battle-time-text');
+    bState.interval = setInterval(() => {
+        if (!bState.active) return clearInterval(bState.interval);
+        
+        bState.time -= 0.05;
+        let perc = (bState.time / 5) * 100;
+        timerBar.style.width = perc + "%";
 
-    const tick = setInterval(() => {
-        if (!battleState.active) {
-            clearInterval(tick);
-            return;
-        }
-
-        battleState.timeLeft -= 0.05;
-        const percent = (battleState.timeLeft / 5) * 100;
-        timerBar.style.width = `${percent}%`;
-        timerText.innerText = `${Math.max(0, battleState.timeLeft).toFixed(1)}s`;
-
-        if (battleState.timeLeft <= 0) {
-            clearInterval(tick);
-            showBattleResult(false);
+        if (bState.time <= 0) {
+            bState.active = false;
+            finishBattle(false);
         }
     }, 50);
 }
 
-// Evento de TAP con Onda Expansiva
-document.getElementById('battle-modal').addEventListener('mousedown', (e) => {
-    if (!battleState.active) return;
+// Listener de Taps corregido para móviles (pointerdown es mejor que mousedown)
+document.getElementById('battle-modal').addEventListener('pointerdown', (e) => {
+    if (!bState.active) return;
 
-    // 1. Lógica de Daño
-    const dmg = localUser.potencia || 10;
-    battleState.hpCurrent -= dmg;
+    // Daño basado en tus stats reales
+    const damage = (window.localUser && window.localUser.potencia) ? window.localUser.potencia : 10;
+    bState.hpCur -= damage;
+    
     updateHealthUI();
+    crearOnda(e.clientX, e.clientY);
 
-    // 2. Onda Expansiva (Ripple)
-    const ripple = document.createElement('div');
-    ripple.className = 'tap-ripple';
-    ripple.style.left = `${e.clientX}px`;
-    ripple.style.top = `${e.clientY}px`;
-    document.getElementById('battle-modal').appendChild(ripple);
-    setTimeout(() => ripple.remove(), 400);
-
-    // 3. Feedback Visual de Daño
-    const card = document.getElementById('battle-opponent-card');
-    card.classList.add('screen-shake');
-    setTimeout(() => card.classList.remove('screen-shake'), 100);
-
-    // 4. ¿Ganó?
-    if (battleState.hpCurrent <= 0) {
-        showBattleResult(true);
+    if (bState.hpCur <= 0) {
+        bState.active = false;
+        finishBattle(true);
     }
 });
 
 function updateHealthUI() {
     const bar = document.getElementById('battle-hp-bar');
-    const text = document.getElementById('battle-hp-text');
-    const percent = (battleState.hpCurrent / battleState.hpMax) * 100;
-
-    bar.style.width = `${Math.max(0, percent)}%`;
-    text.innerText = `${Math.max(0, Math.floor(battleState.hpCurrent))}/${battleState.hpMax} HP`;
-
-    if (percent < 30) bar.className = "h-full bg-red-500 shadow-[0_0_15px_#ef4444]";
-    else if (percent < 60) bar.className = "h-full bg-orange-500";
-    else bar.className = "h-full bg-green-500 shadow-[0_0_10px_#22c55e]";
-}
-
-function showBattleResult(isWin) {
-    battleState.active = false;
-    const res = document.getElementById('battle-result');
-    const title = document.getElementById('result-title');
-    const bpText = document.getElementById('result-bp');
-
-    title.innerText = isWin ? "SISTEMA HACKEADO" : "CONEXIÓN FALLIDA";
-    title.className = isWin ? "text-5xl font-black italic mb-2 text-winner" : "text-5xl font-black italic mb-2 text-loser";
+    const txt = document.getElementById('battle-hp-text');
+    let perc = (bState.hpCur / bState.hpMax) * 100;
     
-    const winBP = 50; // O lo que quieras calcular
-    bpText.innerText = isWin ? `+${winBP} BP` : `-25 BP`;
-    bpText.className = isWin ? "text-cyan-400" : "text-red-500";
-
-    res.classList.replace('hidden', 'flex');
-
-    // Aquí ejecutas la actualización real a Firebase
-    // updateDoc(userRef, { points: increment(isWin ? winBP : -25) });
+    bar.style.width = Math.max(0, perc) + "%";
+    txt.innerText = Math.max(0, Math.floor(bState.hpCur)) + " / " + bState.hpMax + " HP";
 }
 
-window.closeBattleModal = () => {
-    document.getElementById('battle-modal').classList.replace('flex', 'hidden');
-};
+function crearOnda(x, y) {
+    const ripple = document.createElement('div');
+    ripple.className = 'tap-ripple';
+    ripple.style.left = x + 'px';
+    ripple.style.top = y + 'px';
+    document.getElementById('battle-modal').appendChild(ripple);
+    setTimeout(() => ripple.remove(), 400);
+}
+
+function finishBattle(win) {
+    const res = document.getElementById('battle-result');
+    res.classList.remove('hidden');
+    res.style.display = 'flex';
+    
+    document.getElementById('result-title').innerText = win ? "VICTORIA" : "DERROTA";
+    document.getElementById('result-bp').innerText = win ? "+50 BP" : "-25 BP";
+    
+    // Aquí es donde actualizas tu Firebase
+    // updatePoints(win ? 50 : -25); 
+}
         
     </script>
 </body>
