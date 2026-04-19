@@ -86,6 +86,36 @@
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
 }
+
+        /* Onda expansiva del Tap */
+.tap-ripple {
+    position: absolute;
+    border: 2px solid rgba(0, 255, 255, 0.8);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: ripple-effect 0.4s ease-out forwards;
+    z-index: 100;
+}
+
+@keyframes ripple-effect {
+    0% { width: 0; height: 0; opacity: 1; transform: translate(-50%, -50%); }
+    100% { width: 150px; height: 150px; opacity: 0; transform: translate(-50%, -50%); }
+}
+
+/* Vibración de pantalla */
+.screen-shake {
+    animation: shake-anim 0.2s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake-anim {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+.text-winner { color: #22c55e; text-shadow: 0 0 20px #22c55e; }
+.text-loser { color: #ef4444; text-shadow: 0 0 20px #ef4444; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -308,38 +338,54 @@
 
 
         // TAP BATTLE PROTOTYPE
-        <div id="battle-modal" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+        <div id="battle-modal" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center bg-[#05070a]/fb backdrop-blur-md p-4 select-none overflow-hidden">
     
-            <div class="w-full max-w-xs h-2 bg-slate-800 rounded-full mb-8 overflow-hidden border border-cyan-500/30">
-                <div id="battle-timer-bar" class="h-full bg-cyan-500 shadow-[0_0_10px_#06b6d4] transition-all duration-100" style="width: 100%;"></div>
-            </div>
+    <div class="absolute inset-0 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
 
-            <div id="battle-opponent-card" class="relative glass-panel p-6 border-2 border-fuchsia-500/50 rounded-2xl mb-6 transform transition-transform duration-75">
-                <div id="battle-opponent-avatar" class="text-6xl mb-4 text-center">👤</div>
-                <h3 id="battle-opponent-name" class="text-white font-bold text-center cyber-font uppercase tracking-tighter text-xl">RIVAL_NAME</h3>
-                <p id="battle-opponent-level" class="text-fuchsia-400 text-center text-xs italic">Nivel 10</p>
-        
-                <div id="damage-numbers" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
-            </div>
-
-            <div class="w-full max-w-xs mb-8">
-                <div class="flex justify-between text-[10px] text-slate-400 uppercase mb-1 px-1">
-                    <span>HP Rival</span>
-                    <span id="battle-hp-text">100 / 100</span>
-                </div>
-                <div class="w-full h-4 bg-slate-800 rounded-lg border border-white/10 overflow-hidden p-0.5">
-                    <div id="battle-hp-bar" class="h-full bg-green-500 rounded-sm transition-all duration-100" style="width: 100%;"></div>
-                </div>
-            </div>
-
-            <div id="battle-countdown" class="absolute inset-0 flex items-center justify-center bg-black/60 z-50">
-                <h2 id="countdown-text" class="text-6xl font-black italic text-cyan-400 cyber-font">3</h2>
-            </div>
-
-            <div id="tap-instruction" class="text-cyan-400/50 uppercase font-bold text-sm tracking-widest animate-pulse">
-                ¡TAP! ¡TAP! ¡TAP!
-            </div>
+    <div class="w-full max-w-xs mb-10 z-10">
+        <div class="flex justify-between text-[10px] text-cyan-400 font-bold mb-1 tracking-widest uppercase">
+            <span>Enlace Neural</span>
+            <span id="battle-time-text">05.0s</span>
         </div>
+        <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden border border-cyan-900/50">
+            <div id="battle-timer-bar" class="h-full bg-cyan-500 shadow-[0_0_15px_#06b6d4] transition-all duration-100" style="width: 100%;"></div>
+        </div>
+    </div>
+
+    <div id="battle-opponent-card" class="relative group z-10 bg-black/40 p-8 border-2 border-fuchsia-500/30 rounded-3xl mb-8 transform transition-all duration-75 text-center w-64">
+        <div id="battle-opponent-avatar" class="text-7xl mb-4 drop-shadow-[0_0_20px_rgba(217,70,239,0.5)]">👤</div>
+        <h3 id="battle-opponent-name" class="text-white font-black uppercase tracking-tighter text-2xl cyber-font mb-1">Cargando...</h3>
+        <p id="battle-opponent-level" class="text-fuchsia-500 text-xs font-bold tracking-widest uppercase">Nivel 0</p>
+        
+        <div class="mt-6">
+            <div class="w-full h-3 bg-slate-900 rounded-full border border-white/5 p-0.5 overflow-hidden">
+                <div id="battle-hp-bar" class="h-full bg-green-500 transition-all duration-75 shadow-[0_0_10px_rgba(34,197,94,0.5)]" style="width: 100%;"></div>
+            </div>
+            <div id="battle-hp-text" class="text-[9px] text-slate-500 mt-1 font-mono">100/100 HP</div>
+        </div>
+    </div>
+
+    <div id="battle-countdown" class="absolute inset-0 flex items-center justify-center bg-black/80 z-[110]">
+        <div class="text-center">
+            <h2 id="countdown-text" class="text-8xl font-black italic text-cyan-400 animate-pulse">3</h2>
+            <p class="text-cyan-900 uppercase tracking-[1em] mt-4 font-bold">Iniciando</p>
+        </div>
+    </div>
+
+    <div id="battle-result" class="absolute inset-0 z-[120] hidden flex-col items-center justify-center bg-black/95">
+        <h2 id="result-title" class="text-5xl font-black uppercase italic mb-2">VICTORIA</h2>
+        <div id="result-icon" class="text-6xl mb-6">🏆</div>
+        <div class="glass-panel p-6 border-cyan-500/20 text-center w-64">
+            <p id="result-msg" class="text-slate-400 text-sm mb-4">Has hackeado al sistema del rival con éxito.</p>
+            <div class="flex justify-around text-xl font-bold text-white mb-6">
+                <div><span class="text-xs block text-slate-500">BP</span> <span id="result-bp">+0</span></div>
+            </div>
+            <button onclick="closeBattleModal()" class="w-full py-3 bg-cyan-600/20 border border-cyan-500 text-cyan-400 uppercase font-black text-xs hover:bg-cyan-500 hover:text-black transition-all">
+                Cerrar Terminal
+            </button>
+        </div>
+    </div>
+</div>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -400,7 +446,7 @@
             
             try {
                 // REGLA 1: /artifacts/{appId}/public/data/{collection}
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'arena_list'), limit(15));
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'arena_list'), limit(5));
                 const snap = await getDocs(q);
                 listEl.innerHTML = '';
                 
@@ -1019,128 +1065,140 @@ function showTaskModal(title, msg) {
     active: false,
     hpMax: 0,
     hpCurrent: 0,
-    timeLeft: 5,
-    opponentId: null
+    timeLeft: 5.0,
+    opponentData: null
 };
 
 window.iniciarBatallaTap = (opponent) => {
+    // Si pasas el objeto directamente desde el onclick, lo capturamos aquí
+    battleState.opponentData = opponent;
+    
     const modal = document.getElementById('battle-modal');
     const countdown = document.getElementById('battle-countdown');
     const countdownText = document.getElementById('countdown-text');
-    
-    // 1. Configurar datos del combate
-    battleState.active = false;
-    battleState.opponentId = opponent.id;
-    battleState.hpMax = (opponent.level || 1) * 100; // Por ejemplo, 100 HP por nivel
-    battleState.hpCurrent = battleState.hpMax;
-    battleState.timeLeft = 5;
-    
-    // UI Inicial
-    document.getElementById('battle-opponent-name').innerText = opponent.username;
-    document.getElementById('battle-opponent-level').innerText = `Nivel ${opponent.level}`;
-    document.getElementById('battle-hp-text').innerText = `${battleState.hpCurrent} / ${battleState.hpMax}`;
-    document.getElementById('battle-hp-bar').style.width = '100%';
-    document.getElementById('battle-hp-bar').className = 'h-full bg-green-500 rounded-sm';
-    document.getElementById('battle-timer-bar').style.width = '100%';
-    
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    countdown.classList.remove('hidden');
-    countdown.classList.add('flex');
+    const resultScreen = document.getElementById('battle-result');
 
-    // 2. Cuenta atrás: 3, 2, 1, START
-    let count = 3;
-    countdownText.innerText = count;
+    // 1. Inyectar datos (Aseguramos que no esté vacío)
+    document.getElementById('battle-opponent-name').innerText = opponent.username || 'ANÓNIMO';
+    document.getElementById('battle-opponent-level').innerText = `Nivel ${opponent.level || 1}`;
+    document.getElementById('battle-opponent-avatar').innerText = "👤"; // O usa el emoji que tengas en tu BD
     
-    let timer = setInterval(() => {
+    battleState.hpMax = (opponent.level || 1) * 100;
+    battleState.hpCurrent = battleState.hpMax;
+    battleState.timeLeft = 5.0;
+    battleState.active = false;
+
+    // Reset UI
+    updateHealthUI();
+    document.getElementById('battle-timer-bar').style.width = '100%';
+    document.getElementById('battle-time-text').innerText = "05.0s";
+    modal.classList.replace('hidden', 'flex');
+    countdown.classList.replace('hidden', 'flex');
+    resultScreen.classList.add('hidden');
+
+    // 2. Cuenta atrás mejorada
+    let count = 3;
+    const interval = setInterval(() => {
         count--;
-        if(count > 0) {
+        if (count > 0) {
             countdownText.innerText = count;
         } else if (count === 0) {
-            countdownText.innerText = "START!";
-            countdownText.classList.add('scale-150', 'text-fuchsia-500');
+            countdownText.innerText = "GO!";
+            countdownText.className = "text-8xl font-black italic text-fuchsia-500 animate-ping";
         } else {
-            clearInterval(timer);
+            clearInterval(interval);
             countdown.classList.add('hidden');
             battleState.active = true;
-            loopBatalla();
+            runBattleTimer();
         }
-    }, 8000); // 800ms para que sea rápido pero se lea
+    }, 1000);
 };
 
-// El bucle de 5 segundos
-function loopBatalla() {
-    let battleTimer = setInterval(() => {
+function runBattleTimer() {
+    const timerBar = document.getElementById('battle-timer-bar');
+    const timerText = document.getElementById('battle-time-text');
+
+    const tick = setInterval(() => {
         if (!battleState.active) {
-            clearInterval(battleTimer);
+            clearInterval(tick);
             return;
         }
 
-        battleState.timeLeft -= 0.1;
+        battleState.timeLeft -= 0.05;
         const percent = (battleState.timeLeft / 5) * 100;
-        document.getElementById('battle-timer-bar').style.width = `${percent}%`;
+        timerBar.style.width = `${percent}%`;
+        timerText.innerText = `${Math.max(0, battleState.timeLeft).toFixed(1)}s`;
 
         if (battleState.timeLeft <= 0) {
-            clearInterval(battleTimer);
-            finalizarBatalla(false); // Perdiste por tiempo
+            clearInterval(tick);
+            showBattleResult(false);
         }
-    }, 100);
+    }, 50);
 }
 
-// Función que detecta el TAP
-document.getElementById('battle-modal').addEventListener('pointerdown', (e) => {
+// Evento de TAP con Onda Expansiva
+document.getElementById('battle-modal').addEventListener('mousedown', (e) => {
     if (!battleState.active) return;
 
-    // Daño = potencia del jugador (o 10 por defecto para el prototipo)
-    const damage = localUser.potencia || 10;
-    battleState.hpCurrent -= damage;
+    // 1. Lógica de Daño
+    const dmg = localUser.potencia || 10;
+    battleState.hpCurrent -= dmg;
+    updateHealthUI();
 
-    // Feedback Visual
-    spawnDamageText(e.clientX, e.clientY, damage);
+    // 2. Onda Expansiva (Ripple)
+    const ripple = document.createElement('div');
+    ripple.className = 'tap-ripple';
+    ripple.style.left = `${e.clientX}px`;
+    ripple.style.top = `${e.clientY}px`;
+    document.getElementById('battle-modal').appendChild(ripple);
+    setTimeout(() => ripple.remove(), 400);
+
+    // 3. Feedback Visual de Daño
     const card = document.getElementById('battle-opponent-card');
-    card.classList.add('shake-hit');
-    setTimeout(() => card.classList.remove('shake-hit'), 100);
+    card.classList.add('screen-shake');
+    setTimeout(() => card.classList.remove('screen-shake'), 100);
 
-    // Actualizar Barra de Vida
-    const hpPercent = (battleState.hpCurrent / battleState.hpMax) * 100;
-    const hpBar = document.getElementById('battle-hp-bar');
-    hpBar.style.width = `${Math.max(0, hpPercent)}%`;
-    document.getElementById('battle-hp-text').innerText = `${Math.max(0, battleState.hpCurrent)} / ${battleState.hpMax}`;
-
-    // Cambio de color de la barra
-    if (hpPercent < 20) hpBar.className = 'h-full bg-red-600 rounded-sm';
-    else if (hpPercent < 50) hpBar.className = 'h-full bg-orange-500 rounded-sm';
-    else if (hpPercent < 80) hpBar.className = 'h-full bg-yellow-400 rounded-sm';
-
+    // 4. ¿Ganó?
     if (battleState.hpCurrent <= 0) {
-        finalizarBatalla(true); // ¡Ganaste!
+        showBattleResult(true);
     }
 });
 
-function spawnDamageText(x, y, damage) {
-    const el = document.createElement('div');
-    el.className = 'damage-float';
-    el.innerText = `-${damage}`;
-    el.style.left = `${x - 20}px`;
-    el.style.top = `${y - 40}px`;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 600);
+function updateHealthUI() {
+    const bar = document.getElementById('battle-hp-bar');
+    const text = document.getElementById('battle-hp-text');
+    const percent = (battleState.hpCurrent / battleState.hpMax) * 100;
+
+    bar.style.width = `${Math.max(0, percent)}%`;
+    text.innerText = `${Math.max(0, Math.floor(battleState.hpCurrent))}/${battleState.hpMax} HP`;
+
+    if (percent < 30) bar.className = "h-full bg-red-500 shadow-[0_0_15px_#ef4444]";
+    else if (percent < 60) bar.className = "h-full bg-orange-500";
+    else bar.className = "h-full bg-green-500 shadow-[0_0_10px_#22c55e]";
 }
 
-async function finalizarBatalla(victoria) {
+function showBattleResult(isWin) {
     battleState.active = false;
-    const modal = document.getElementById('battle-modal');
+    const res = document.getElementById('battle-result');
+    const title = document.getElementById('result-title');
+    const bpText = document.getElementById('result-bp');
+
+    title.innerText = isWin ? "SISTEMA HACKEADO" : "CONEXIÓN FALLIDA";
+    title.className = isWin ? "text-5xl font-black italic mb-2 text-winner" : "text-5xl font-black italic mb-2 text-loser";
     
-    if (victoria) {
-        alert("¡VICTORIA! Has derrotado a tu oponente.");
-        // Aquí actualizas Firebase: +10 BP por ejemplo
-    } else {
-        alert("DERROTA... El tiempo se agotó.");
-        // Aquí actualizas Firebase: -5 BP por ejemplo
-    }
-    
-    modal.classList.add('hidden');
+    const winBP = 50; // O lo que quieras calcular
+    bpText.innerText = isWin ? `+${winBP} BP` : `-25 BP`;
+    bpText.className = isWin ? "text-cyan-400" : "text-red-500";
+
+    res.classList.replace('hidden', 'flex');
+
+    // Aquí ejecutas la actualización real a Firebase
+    // updateDoc(userRef, { points: increment(isWin ? winBP : -25) });
 }
+
+window.closeBattleModal = () => {
+    document.getElementById('battle-modal').classList.replace('flex', 'hidden');
+};
         
     </script>
 </body>
