@@ -297,6 +297,16 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'burst-clicker-game';
+
+        // Captura inmediata del parámetro de referido
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+
+        const startParam = tg.initDataUnsafe?.start_param;
+        if (startParam) {
+            sessionStorage.setItem('pending_referrer', startParam);
+            console.log("Referido detectado y guardado:", startParam);
+        }
         
         let localUser = null;
         let isProcessingBattle = false;
@@ -530,8 +540,8 @@
                 const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
                 const pSnap = await getDoc(pRef);
 
-                const tg = window.Telegram.WebApp;
-                const referrerId = tg.initDataUnsafe?.start_param;
+                //const tg = window.Telegram.WebApp;
+                const referrerId = startParam;
 
                 if (!pSnap.exists()) {
                     const stats = {
