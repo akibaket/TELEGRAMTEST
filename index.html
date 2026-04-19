@@ -542,12 +542,6 @@
                     const name = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || "Runner_" + user.uid.slice(0,4);
                     const data = { uid: user.uid, username: name, points: 100, usdt: 0.00, level: 1, energy: 10, stats, createdAt: serverTimestamp(), referralsCount: 0, 
                                   referredBy: referrerId || null, };
-                    
-                    await setDoc(pRef, data);
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', user.uid), { 
-                        username: name, level: 1, uid: user.uid 
-                    });
-                }
 
                 // 3. RECOMPENSAR AL QUE LO INVITÓ (Si existe un referrerId y no es él mismo)
                 if (referrerId && referrerId !== user.uid) {
@@ -555,13 +549,22 @@
                         const referrerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', referrerId);
                         await updateDoc(referrerRef, {
                                 referralsCount: increment(1), // Le sumamos 1 al contador
-                                points: increment(10) // ¡Premio por invitar! (Ajusta esto a tu economía)
+                                points: increment(50) // ¡Premio por invitar! (Ajusta esto a tu economía)
                         });
                         console.log("Recompensa enviada al reclutador:", referrerId);
                     } catch (e) {
                         console.error("Error al recompensar al reclutador:", e);
                     }
                 }
+
+        
+                    await setDoc(pRef, data);
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'arena_list', user.uid), { 
+                        username: name, level: 1, uid: user.uid 
+                    });
+                }
+
+                
 
                 onSnapshot(pRef, (snap) => {
                     if (snap.exists()) {
