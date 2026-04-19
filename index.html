@@ -59,6 +59,33 @@
     box-shadow: 0 0 15px currentColor;
     z-index: 30;
 }
+
+        /* Animación para los números de daño */
+.damage-float {
+    position: absolute;
+    color: #ff0000;
+    font-weight: 900;
+    font-family: sans-serif;
+    pointer-events: none;
+    animation: floatUp 0.6s ease-out forwards;
+    text-shadow: 0 0 5px black;
+}
+
+@keyframes floatUp {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+}
+
+/* Efecto sacudida cuando recibe daño */
+.shake-hit {
+    animation: shake 0.1s ease-in-out infinite;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -278,6 +305,41 @@
                 </button>
             </div>
         </div>
+
+
+        // TAP BATTLE PROTOTYPE
+        <div id="battle-modal" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+    
+            <div class="w-full max-w-xs h-2 bg-slate-800 rounded-full mb-8 overflow-hidden border border-cyan-500/30">
+                <div id="battle-timer-bar" class="h-full bg-cyan-500 shadow-[0_0_10px_#06b6d4] transition-all duration-100" style="width: 100%;"></div>
+            </div>
+
+            <div id="battle-opponent-card" class="relative glass-panel p-6 border-2 border-fuchsia-500/50 rounded-2xl mb-6 transform transition-transform duration-75">
+                <div id="battle-opponent-avatar" class="text-6xl mb-4 text-center">👤</div>
+                <h3 id="battle-opponent-name" class="text-white font-bold text-center cyber-font uppercase tracking-tighter text-xl">RIVAL_NAME</h3>
+                <p id="battle-opponent-level" class="text-fuchsia-400 text-center text-xs italic">Nivel 10</p>
+        
+                <div id="damage-numbers" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+            </div>
+
+            <div class="w-full max-w-xs mb-8">
+                <div class="flex justify-between text-[10px] text-slate-400 uppercase mb-1 px-1">
+                    <span>HP Rival</span>
+                    <span id="battle-hp-text">100 / 100</span>
+                </div>
+                <div class="w-full h-4 bg-slate-800 rounded-lg border border-white/10 overflow-hidden p-0.5">
+                    <div id="battle-hp-bar" class="h-full bg-green-500 rounded-sm transition-all duration-100" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <div id="battle-countdown" class="absolute inset-0 flex items-center justify-center bg-black/60 z-50">
+                <h2 id="countdown-text" class="text-6xl font-black italic text-cyan-400 cyber-font">3</h2>
+            </div>
+
+            <div id="tap-instruction" class="text-cyan-400/50 uppercase font-bold text-sm tracking-widest animate-pulse">
+                ¡TAP! ¡TAP! ¡TAP!
+            </div>
+        </div>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -363,7 +425,7 @@
                                 <div class="text-[9px] text-cyan-600 cyber-font uppercase tracking-tighter">LV.${rival.level} • BURST READY</div>
                             </div>
                         </div>
-                        <button id="btn-${rival.uid}" onclick="startDuel('${rival.uid}')" class="bg-cyan-600 text-white text-[9px] font-bold px-4 py-2 rounded-lg cyber-font uppercase tracking-widest hover:bg-cyan-500 transition-colors">Retar</button>
+                        <button id="btn-${rival.uid}" onclick="iniciarBatallaTap('${rival.uid}')" class="bg-cyan-600 text-white text-[9px] font-bold px-4 py-2 rounded-lg cyber-font uppercase tracking-widest hover:bg-cyan-500 transition-colors">Retar</button>
                     `;
                     listEl.appendChild(div);
                 });
@@ -948,6 +1010,136 @@ function showTaskModal(title, msg) {
     document.getElementById('battle-log').innerText = msg;
     document.getElementById('battle-reward').innerText = "OK";
     document.getElementById('battle-modal').classList.remove('hidden');
+}
+
+
+        // TAP BATTLE PROTOTYPE
+
+        let battleState = {
+    active: false,
+    hpMax: 0,
+    hpCurrent: 0,
+    timeLeft: 5,
+    opponentId: null
+};
+
+window.iniciarBatallaTap = (opponent) => {
+    const modal = document.getElementById('battle-modal');
+    const countdown = document.getElementById('battle-countdown');
+    const countdownText = document.getElementById('countdown-text');
+    
+    // 1. Configurar datos del combate
+    battleState.active = false;
+    battleState.opponentId = opponent.id;
+    battleState.hpMax = (opponent.level || 1) * 100; // Por ejemplo, 100 HP por nivel
+    battleState.hpCurrent = battleState.hpMax;
+    battleState.timeLeft = 5;
+    
+    // UI Inicial
+    document.getElementById('battle-opponent-name').innerText = opponent.username;
+    document.getElementById('battle-opponent-level').innerText = `Nivel ${opponent.level}`;
+    document.getElementById('battle-hp-text').innerText = `${battleState.hpCurrent} / ${battleState.hpMax}`;
+    document.getElementById('battle-hp-bar').style.width = '100%';
+    document.getElementById('battle-hp-bar').className = 'h-full bg-green-500 rounded-sm';
+    document.getElementById('battle-timer-bar').style.width = '100%';
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    countdown.classList.remove('hidden');
+    countdown.classList.add('flex');
+
+    // 2. Cuenta atrás: 3, 2, 1, START
+    let count = 3;
+    countdownText.innerText = count;
+    
+    let timer = setInterval(() => {
+        count--;
+        if(count > 0) {
+            countdownText.innerText = count;
+        } else if (count === 0) {
+            countdownText.innerText = "START!";
+            countdownText.classList.add('scale-150', 'text-fuchsia-500');
+        } else {
+            clearInterval(timer);
+            countdown.classList.add('hidden');
+            battleState.active = true;
+            loopBatalla();
+        }
+    }, 8000); // 800ms para que sea rápido pero se lea
+};
+
+// El bucle de 5 segundos
+function loopBatalla() {
+    let battleTimer = setInterval(() => {
+        if (!battleState.active) {
+            clearInterval(battleTimer);
+            return;
+        }
+
+        battleState.timeLeft -= 0.1;
+        const percent = (battleState.timeLeft / 5) * 100;
+        document.getElementById('battle-timer-bar').style.width = `${percent}%`;
+
+        if (battleState.timeLeft <= 0) {
+            clearInterval(battleTimer);
+            finalizarBatalla(false); // Perdiste por tiempo
+        }
+    }, 100);
+}
+
+// Función que detecta el TAP
+document.getElementById('battle-modal').addEventListener('pointerdown', (e) => {
+    if (!battleState.active) return;
+
+    // Daño = potencia del jugador (o 10 por defecto para el prototipo)
+    const damage = localUser.potencia || 10;
+    battleState.hpCurrent -= damage;
+
+    // Feedback Visual
+    spawnDamageText(e.clientX, e.clientY, damage);
+    const card = document.getElementById('battle-opponent-card');
+    card.classList.add('shake-hit');
+    setTimeout(() => card.classList.remove('shake-hit'), 100);
+
+    // Actualizar Barra de Vida
+    const hpPercent = (battleState.hpCurrent / battleState.hpMax) * 100;
+    const hpBar = document.getElementById('battle-hp-bar');
+    hpBar.style.width = `${Math.max(0, hpPercent)}%`;
+    document.getElementById('battle-hp-text').innerText = `${Math.max(0, battleState.hpCurrent)} / ${battleState.hpMax}`;
+
+    // Cambio de color de la barra
+    if (hpPercent < 20) hpBar.className = 'h-full bg-red-600 rounded-sm';
+    else if (hpPercent < 50) hpBar.className = 'h-full bg-orange-500 rounded-sm';
+    else if (hpPercent < 80) hpBar.className = 'h-full bg-yellow-400 rounded-sm';
+
+    if (battleState.hpCurrent <= 0) {
+        finalizarBatalla(true); // ¡Ganaste!
+    }
+});
+
+function spawnDamageText(x, y, damage) {
+    const el = document.createElement('div');
+    el.className = 'damage-float';
+    el.innerText = `-${damage}`;
+    el.style.left = `${x - 20}px`;
+    el.style.top = `${y - 40}px`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 600);
+}
+
+async function finalizarBatalla(victoria) {
+    battleState.active = false;
+    const modal = document.getElementById('battle-modal');
+    
+    if (victoria) {
+        alert("¡VICTORIA! Has derrotado a tu oponente.");
+        // Aquí actualizas Firebase: +10 BP por ejemplo
+    } else {
+        alert("DERROTA... El tiempo se agotó.");
+        // Aquí actualizas Firebase: -5 BP por ejemplo
+    }
+    
+    modal.classList.add('hidden');
 }
         
     </script>
